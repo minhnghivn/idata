@@ -1,0 +1,222 @@
+# DATA LOADER
+#
+# @author Nghi Pham
+# @date April 2014
+#
+# The script loads data from a fixed-width text file or a CSV file and fills in
+# a corresponding table in the specified database
+# Issue ruby load.rb --help for guideline/examples
+#
+# @todo Make the script OOP
+# @todo Constantize default values
+require 'optparse'
+require 'csv'
+require 'active_record'
+require 'rubygems'
+require 'digest/sha1'
+require 'fileutils'
+
+# Default configuration settings
+POSTGRESQL_PORT = 5432
+
+# Parse script inputs
+$options = {}
+parser = OptionParser.new("", 24) do |opts|
+  opts.banner = "\nProgram: Data Loader\nAuthor: MCKI\n\n"
+
+  opts.on("-e", "--eval SCRIPT", "Ruby SCRIPT to execute") do |v|
+    $options[:eval] = v
+  end
+
+  opts.on("-t", "--table TABLE", "Table name to be created") do |v|
+    $options[:table] = v
+  end
+
+  opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
+    $options[:host] = v
+  end
+
+  opts.on("-d", "--database DATABASE", "PostgreSQL database") do |v|
+    $options[:database] = v
+  end
+
+  opts.on("-u", "--username USER", "PostgreSQL username") do |v|
+    $options[:username] = v
+  end
+
+  opts.on("-p", "--password PASSWORD", "PostgreSQL password") do |v|
+    $options[:password] = v
+  end
+
+  opts.on("-l", "--listen PORT", "PostgreSQL listen port (default to 5432)") do |v|
+    $options[:listen] = v
+  end
+
+  opts.on_tail('--help', 'Displays this help') do
+		puts opts, "", help
+    exit
+	end
+end
+
+# Help message
+def help
+  return <<-eos
+
+EXAMPLES
+-------------------------------------------------------
+Run a custom Ruby command on the every record represented by the `item` variable
+
+    ruby eval.rb --host=localhost --username=postgres --password=postgres \\
+                 --table=vendors --database=db \\
+                 --eval="item.last_name = item.full_name.split(/\\s+/).last"
+
+eos
+end
+
+begin
+  parser.parse!
+rescue SystemExit => ex
+  exit
+end
+
+# Certain arguments are required
+if $options[:eval].nil?
+  puts "\nPlease specify Ruby script to execute: -e\n\n"
+  exit
+end
+
+if $options[:table].nil?
+  puts "\nPlease specify SQL table name: -t\n\n"
+  exit
+end
+
+if $options[:host].nil?
+  puts "\nPlease specify host name: -h\n\n"
+  exit
+end
+
+if $options[:database].nil?
+  puts "\nPlease specify PostgreSQL database name: -d\n\n"
+  exit
+end
+
+if $options[:username].nil?
+  puts "\nPlease specify PostgreSQL username: -d\n\n"
+  exit
+end
+
+# Default in case arguments are not provided
+$options[:listen] ||= POSTGRESQL_PORT
+
+# Connect to PostgreSQL
+# $options = {host: 'localhost', database: 'db', username: 'postgres', password: 'postgres', table: 'products', listen: 5432}
+ActiveRecord::Base.establish_connection(
+  'adapter' => 'postgresql',
+  'host' => $options[:host],
+  'database' => $options[:database],
+  'username' => $options[:username],
+  'password' => $options[:password],
+  'port' => $options[:listen],
+  'timeout' => 15000
+)
+
+class Product < ActiveRecord::Base
+  self.primary_key = :id
+  self.table_name = $options[:table]
+end
+
+# Temp file & temp table name
+$tmpfile = "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
+$tmpname = "_tmp_#{Digest::SHA1.hexdigest(rand(100000).to_s)}"
+
+# Check if PostgreSQL host is local
+def local?
+  return ['localhost', '127.0.0.1'].include?($options[:host])
+end
+
+# Execute query
+def query(*query_str)
+  ActiveRecord::Base.connection.execute(query_str.join("; "))
+end
+
+# Create table from CSV
+def create_table_from_csv(name, csv_path)
+  # Get headers
+  csv = CSV.open(csv_path, :headers => true)
+  first = csv.first
+  unless first
+    raise "File Empty!!!"
+  end
+  
+  # sanitize
+  headers = first.headers
+  headers.each_with_index {|e, index|
+    if e.nil? or e.empty?
+      headers[index] = "column_#{index + 1}"
+    end
+  }
+  headers.map!{|e| e.downcase.underscore }
+  
+  # check if every field name is unique
+  if headers.count != headers.uniq.count
+    raise "Field name must be UNIQUE: \nPlease check your input headers: [#{headers.join(', ')}]"
+  end
+
+  # Create table
+  create_table_sql = headers.map{|e| e == 'id' ? "\"#{e}\" integer" : "\"#{e}\" text"}.join(",")
+  create_table_sql = "drop table if exists #{name}; create table #{name}( #{create_table_sql} );"
+  query(create_table_sql)
+
+  # Dump data
+  insert_data_sql = headers.map{|e| "\"#{e}\""}.join(",")
+  insert_data_sql = "COPY #{name}( #{insert_data_sql} ) FROM '#{csv_path}' DELIMITER ',' CSV HEADER;"
+
+  # Change output file permission so that postgres user can read it
+  begin
+    FileUtils.chmod 0755, csv_path
+  rescue Exception => ex
+    puts "Error while changing file permission"
+  end
+
+  if local?
+    query(insert_data_sql)
+  else
+    puts "\nWARNING: pushing data to remote server [#{$options[:host]}].\nBe sure you have the correct version of `psql` command installed\n\n"
+    insert_data_sql = "PGPASSWORD=#{$options[:username]} psql -U #{$options[:username]} -h #{$options[:host]} -p #{$options[:listen]} #{$options[:database]} -c \"\\#{insert_data_sql}\""
+
+    `#{insert_data_sql}`
+    `PGPASSWORD=""`
+  end
+end
+
+if !local? and $options[:password].nil?
+  puts "\n\nERROR: You are connecting to a remote server\nPlease make sure you specify SQL password: --password \n\n"
+  exit
+end
+
+fields_changed = []
+
+CSV.open($tmpfile, "wb", :col_sep => ',') do |csv|
+  csv << Product.first.attributes.keys
+  
+  Product.all.each do |item|
+    # Execute the script provided on every record
+    eval($options[:eval])
+    fields_changed += item.changes.keys
+    fields_changed.uniq!
+    csv << item.attributes.values
+  end
+end
+
+unless fields_changed.empty?
+  create_table_from_csv($tmpname, $tmpfile)
+  update_sql = fields_changed.map{|f| "\"#{f}\" = tmp.\"#{f}\""}.join(", ")
+  update_sql = "UPDATE #{$options[:table]} origin SET #{update_sql} FROM #{$tmpname} tmp WHERE origin.id = tmp.id"
+  query(update_sql)
+
+  cleanup_sql = "DROP TABLE #{$tmpname};"
+  query(cleanup_sql)
+
+  puts "\nDone\n\n"
+end
+

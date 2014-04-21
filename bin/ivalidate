@@ -1,0 +1,258 @@
+# DATA VALIDATOR
+#
+# @author Nghi Pham
+# @date April 2014
+#
+# Data validation includes:
+# * Uniqueness
+# * Integrity (cross reference)
+# * Data type: numeric, text, enum, etc.
+# * Data format: text size, text values, enum, inclusion, exclusion, etc.
+#
+# Issue ruby load.rb --help for guideline/examples
+#
+require 'optparse'
+require 'csv'
+require 'active_record'
+require 'rubygems'
+require 'digest/sha1'
+
+$options = {
+  :unique => [],
+  :not_null => [],
+  :match => [],
+  :not_match => [],
+  :cross_reference => []
+}
+parser = OptionParser.new("", 24) do |opts|
+  opts.banner = "\nProgram: Data Validator\nAuthor: MCKI\n\n"
+
+  opts.on("--unique FIELD", "Check if FIELD is unique") do |v|
+    $options[:unique] << v
+  end
+
+  opts.on("--not-null FIELD", "Check if FIELD is not null or empty") do |v|
+    $options[:not_null] << v
+  end
+
+  opts.on("--match REGEXP", "Check if FIELD matches REGEXP") do |v|
+    $options[:match] << v
+  end
+
+  opts.on("--not-match REGEXP", "Check if FIELD does not match REGEXP") do |v|
+    $options[:not_match] << v
+  end
+
+  opts.on("--cross-reference EXPR", "Reference") do |v|
+    $options[:cross_reference] << v
+  end
+
+  opts.on("-t", "--table TABLE", "Table to verify") do |v|
+    $options[:table] = v
+  end
+
+  opts.on("--log-to FIELD", "Field to log error to") do |v|
+    $options[:log_to] = v
+  end
+
+  opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
+    $options[:host] = v
+  end
+
+  opts.on("-d", "--database DATABASE", "PostgreSQL database") do |v|
+    $options[:database] = v
+  end
+
+  opts.on("-u", "--username USER", "PostgreSQL username") do |v|
+    $options[:username] = v
+  end
+
+  opts.on("-p", "--password PASSWORD", "PostgreSQL password") do |v|
+    $options[:password] = v
+  end
+
+  opts.on("-l", "--listen PORT", "PostgreSQL listen port (default to 5432)") do |v|
+    $options[:listen] = v
+  end
+
+  opts.on_tail('--help', 'Displays this help') do
+		puts opts, "", help
+    exit
+	end
+end
+
+def help
+  return <<-eos
+
+EXAMPLES
+-------------------------------------------------------
+Validate `mfrs` table against several rules and write error logs to errors field:
+
+    ruby validate.rb -h localhost -u postgres -p postgres -d db \\
+                --table=mfrs \\
+                --log-to=errors \\
+                --unique="mfr_lic" \\
+                --unique="mfr_number" \\
+                --not-null="mfr_number" \\
+                --not-null="mfr_lic" \\
+                --match="mfr_number/^2.*/" \\
+                --match="mfr_name/^[a-zA-Z]+/" \\
+                --not-match="status/(failed|inactive|wrong)/"
+
+eos
+end
+
+begin
+  parser.parse!
+rescue SystemExit => ex
+  exit
+end
+
+if $options[:table].nil?
+  puts "\nPlease specify table name: -t\n\n"
+  exit
+end
+
+if $options[:log_to].nil?
+  puts "\nPlease specify field to log errors: --log-to\n\n"
+  exit
+end
+
+if $options[:host].nil?
+  puts "\nPlease specify host name: -h\n\n"
+  exit
+end
+
+if $options[:database].nil?
+  puts "\nPlease specify PostgreSQL database name: -d\n\n"
+  exit
+end
+
+if $options[:username].nil?
+  puts "\nPlease specify PostgreSQL username: -d\n\n"
+  exit
+end
+
+# Default value
+$options[:listen] ||= 5432
+$options[:output] ||= "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
+
+# Database dump
+ActiveRecord::Base.establish_connection(
+  'adapter' => 'postgresql',
+  'host' => $options[:host],
+  'database' => $options[:database],
+  'username' => $options[:username],
+  'password' => $options[:password],
+  'port' => $options[:listen],
+  'timeout' => 15000
+)
+
+# --------------------------------------------------------------------
+# Preliminary check
+# Add column errors if not yet exists
+# --------------------------------------------------------------------
+pre_sql = <<-eos
+  DO $$ 
+    BEGIN
+      BEGIN
+        ALTER TABLE #{$options[:table]} ADD COLUMN #{$options[:log_to]} text default '';
+      EXCEPTION
+        WHEN duplicate_column THEN RAISE NOTICE 'column #{$options[:log_to]} already exists';
+      END;
+    END;
+  $$
+eos
+
+ActiveRecord::Base.connection.execute(pre_sql)
+
+# --------------------------------------------------------------------
+# Check unique field
+# --------------------------------------------------------------------
+$options[:unique].each do |field|
+  puts "Checking unique fields: #{field}"
+
+  uniq_sql = <<-eos
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field}-not-unique', ' || '), ' || ')
+    WHERE #{field} IN (
+      SELECT #{field} FROM #{$options[:table]} GROUP BY #{field}
+      HAVING count(*) > 1
+    ) AND #{field} IS NOT NULL AND length(trim(#{field})) <> 0;
+  eos
+  
+  ActiveRecord::Base.connection.execute(uniq_sql)
+end
+
+# --------------------------------------------------------------------
+# Check not-null field
+# --------------------------------------------------------------------
+$options[:not_null].each do |field|
+  puts "Checking not-null fields: #{field}"
+
+  not_null_sql = <<-eos
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field}-null', ' || '), ' || ')
+    WHERE #{field} IS NULL OR length(trim(#{field})) = 0;
+  eos
+  
+  ActiveRecord::Base.connection.execute(not_null_sql)
+end
+
+# --------------------------------------------------------------------
+# Check field satisfying --match=FIELD/REGEXP/
+# --------------------------------------------------------------------
+$options[:match].each do |value|
+  field = value[/^[^\/]+/]
+  regexp = value[/(?<=\/).*(?=\/)/]
+  puts "Checking REGEXP matching: #{regexp}"
+
+  match_sql = <<-eos
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{regexp.gsub("'", "''")}-not-matched', ' || '), ' || ')
+    WHERE #{field} IS NOT NULL AND length(trim(#{field})) <> 0 AND #{field} !~ '#{regexp}';
+  eos
+  
+  ActiveRecord::Base.connection.execute(match_sql)
+end
+
+# --------------------------------------------------------------------
+# Check field satisfying --not-match=FIELD/REGEXP/
+# --------------------------------------------------------------------
+$options[:not_match].each do |value|
+  field = value[/^[^\/]+/]
+  regexp = value[/(?<=\/).*(?=\/)/]
+  puts "Checking REGEXP not matching: #{regexp}"
+
+  not_match_sql = <<-eos
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{regexp.gsub("'", "''")}-unexpectedly-matched', ' || '), ' || ')
+    WHERE #{field} IS NOT NULL AND length(trim(#{field})) <> 0 AND #{field} ~ '#{regexp}';
+  eos
+  
+  ActiveRecord::Base.connection.execute(not_match_sql)
+end
+
+# --------------------------------------------------------------------
+# Check field satisfying --cross-reference
+# --------------------------------------------------------------------
+$options[:cross_reference].each do |value|
+  values = value.split(/[|\.]/)
+
+  if values.size != 3
+    raise "Error: Wrong argument for --cross-reference switch"
+    exit(0)
+  end
+
+  field = values[0]
+  ref_table = values[1]
+  ref_field = values[2]
+
+  puts "Checking data integrity: #{value}"
+
+  # @todo: poor performance here, think of a better SQL!!!
+  ref_sql = <<-eos
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field}-not-referenced-to-#{values[1]}.#{values[2]}', ' || '), ' || ')
+    WHERE #{field} NOT IN (
+      SELECT #{ref_field} FROM #{ref_table}
+    ) AND #{field} IS NOT NULL AND length(trim(#{field})) <> 0;
+  eos
+  
+  ActiveRecord::Base.connection.execute(ref_sql)
+end

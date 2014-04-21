@@ -1,0 +1,297 @@
+# DATA LOADER
+#
+# @author Nghi Pham
+# @date April 2014
+#
+# The script loads data from a fixed-width text file or a CSV file and fills in
+# a corresponding table in the specified database
+# Issue ruby load.rb --help for guideline/examples
+#
+require 'optparse'
+require 'csv'
+require 'active_record'
+require 'rubygems'
+require 'digest/sha1'
+require 'fileutils'
+
+SUPPORTED_INPUT_FORMATS = ['CSV', 'FX']
+POSTGRESQL_PORT = 5432
+CSV_DEFAULT_DELIMITER = ','
+CSV_DEFAULT_QUOTE = '"'
+
+PG_TAB = "E'\t'"
+PG_BACKSPACE = "E'\b'"
+
+PG_CHAR_MAP = {
+  "\t" => PG_TAB,
+  "\b" => PG_BACKSPACE
+}
+
+$options = {}
+parser = OptionParser.new("", 24) do |opts|
+  opts.banner = "\nProgram: Data Loader\nAuthor: MCKI\n\n"
+
+  opts.on("-i", "--input INPUT", "INPUT text file (fixed-width)") do |v|
+    $options[:input] = v
+  end
+
+  opts.on("-f", "--format FORMAT", "Input file format, available values include (CSV|FX) ") do |v|
+    $options[:format] = v
+  end
+
+  opts.on("--delim DELIMITER", "Field DELIMITER (for CSV format only - default to COMMA ',')") do |v|
+    $options[:delim] = v
+  end
+
+  opts.on("--quote QUOTE", "Default to '\"'") do |v|
+    $options[:quote] = v
+  end
+
+  # opts.on("-o", "--output CSV", "Temporary CSV output file") do |v|
+  #   $options[:output] = v
+  # end
+
+  opts.on("-t", "--table TABLE", "Table name to be created") do |v|
+    $options[:table] = v
+  end
+
+  opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
+    $options[:host] = v
+  end
+
+  opts.on("-d", "--database DATABASE", "PostgreSQL database") do |v|
+    $options[:database] = v
+  end
+
+  opts.on("-u", "--username USER", "PostgreSQL username") do |v|
+    $options[:username] = v
+  end
+
+  opts.on("-p", "--password PASSWORD", "PostgreSQL password") do |v|
+    $options[:password] = v
+  end
+
+  opts.on("-l", "--listen PORT", "PostgreSQL listen port (default to 5432)") do |v|
+    $options[:listen] = v
+  end
+
+  opts.on_tail('--help', 'Displays this help') do
+		puts opts, "", help
+    exit
+	end
+end
+
+def help
+  return <<-eos
+
+EXAMPLES
+-------------------------------------------------------
+Load data from text file and store to a table name "vendors"
+
+    ruby load.rb --host=localhost --username=postgres --password=postgres \\
+                 --input=/home/administrator/VendorMaster.txt --format=fx \\
+                 --table=vendors --database=db
+
+
+The same usage in short form:
+  
+    ruby load.rb -h localhost -u postgres -p postgres \\
+                 -i /home/administrator/VendorMaster.txt -f fx \\
+                 -t vendors -d db
+
+eos
+end
+
+begin
+  parser.parse!
+rescue SystemExit => ex
+  exit
+end
+
+if $options[:input].nil?
+  puts "\nPlease specify input file: -i\n\n"
+  exit
+end
+
+if $options[:format].nil?
+  puts "\nPlease specify input file format: -f\n\n"
+  exit
+end
+
+# downcase for consistency
+$options[:format].upcase!
+
+if !SUPPORTED_INPUT_FORMATS.include?($options[:format])
+  puts "\nInvalid input file format, supported formats are: #{SUPPORTED_INPUT_FORMATS.join(', ')}\n\n"
+  exit
+end
+
+if $options[:table].nil?
+  puts "\nPlease specify table name: -t\n\n"
+  exit
+end
+
+unless File.exists?($options[:input])
+  puts "\nFile does not exist"
+  exit
+end
+
+if $options[:host].nil?
+  puts "\nPlease specify host name: -h\n\n"
+  exit
+end
+
+if $options[:database].nil?
+  puts "\nPlease specify PostgreSQL database name: -d\n\n"
+  exit
+end
+
+if $options[:username].nil?
+  puts "\nPlease specify PostgreSQL username: -d\n\n"
+  exit
+end
+
+# Default value
+$options[:listen] ||= POSTGRESQL_PORT
+$options[:delim] ||= CSV_DEFAULT_DELIMITER
+$options[:quote] ||= CSV_DEFAULT_QUOTE
+
+$tmpfile = "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
+
+# Database dump
+ActiveRecord::Base.establish_connection(
+  'adapter' => 'postgresql',
+  'host' => $options[:host],
+  'database' => $options[:database],
+  'username' => $options[:username],
+  'password' => $options[:password],
+  'port' => $options[:listen],
+  'timeout' => 15000
+)
+
+class String
+  def underscore
+    return self if self.nil?
+    return self.strip.gsub(/[^a-z0-9]+/, "_")
+  end
+end
+
+class MyParser
+  def initialize
+    # remote server always requires password
+    if !local? and $options[:password].nil?
+      raise "You are connecting to a remote server\nPlease make sure you specify SQL password: --password "
+    end
+  end
+
+  def run  
+    load_fx if $options[:format] == 'FX'
+    load_csv if $options[:format] == 'CSV'
+  end
+
+  def load_csv
+    # Copy file to /tmp/ folder to prevent Permission Error 
+    FileUtils.cp $options[:input], $tmpfile
+    create_table_from_csv($tmpfile)
+  end
+
+  def load_fx
+    # Load data
+    data = IO.read($options[:input]).split("\n")
+    header = data.shift
+    headers = header.scan(/[^\s]+\s+/)
+
+    # Parse
+    ranges = headers.map{|s| "a#{s.size}"}.join("")
+    headers.map!{|s| s.downcase.strip }
+
+    # Write
+    CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER, quote_char: "\b") do |csv|
+      csv << headers
+
+      data.each_with_index{|s, index|
+        record = s.unpack(ranges).map{|e| e.strip}
+        csv << record
+      }
+    end
+
+    create_table_from_csv($tmpfile)
+  end
+
+  def create_table_from_csv(csv_path)
+    # Get headers
+    csv = CSV.open(csv_path, :headers => true, :col_sep => $options[:delim], quote_char: "\b")
+    
+    first = csv.first
+    unless first
+      raise "File Empty!!!"
+    end
+    
+    # sanitize
+    headers = first.headers
+    headers.each_with_index {|e, index|
+      if e.nil? or e.empty?
+        headers[index] = "column_#{index + 1}"
+      end
+    }
+    headers.map!{|e| e.downcase.underscore }
+    
+    # check if every field name is unique
+    if headers.count != headers.uniq.count
+      raise "Field name must be UNIQUE: \nPlease check your input headers: [#{headers.sort.join(', ')}]"
+    end
+
+    # Create table
+    create_table_sql = headers.map{|e| "\"#{e}\" text"}.join(",")
+    create_table_sql = "drop table if exists #{$options[:table]}; create table #{$options[:table]}( id serial not null, #{create_table_sql} );"
+    query(create_table_sql)
+
+    # Dump data
+    #pg_tab = "E'\t'" if $options[:delim] == "\t"
+
+    tab = PG_CHAR_MAP[$options[:delim]]
+    tab ||= "'#{$options[:delim]}'"
+
+    quote = PG_CHAR_MAP[$options[:quote]]
+    quote = "'#{$options[:quote]}'"
+    
+    insert_data_sql = headers.map{|e| "\"#{e}\""}.join(",")
+    insert_data_sql = "COPY #{$options[:table]}( #{insert_data_sql} ) FROM '#{csv_path}' DELIMITER #{tab} CSV HEADER QUOTE #{quote};"
+    
+    # Change output file permission so that postgres user can read it
+    begin
+      FileUtils.chmod 0755, csv_path
+    rescue Exception => ex
+      puts "Error while changing file permission"
+    end
+
+    if local?
+      query(insert_data_sql)
+    else
+      puts "\nWARNING: pushing data to remote server [#{$options[:host]}].\nBe sure you have the correct version of `psql` command installed\n\n"
+      insert_data_sql = "PGPASSWORD=#{$options[:username]} psql -U #{$options[:username]} -h #{$options[:host]} -p #{$options[:listen]} #{$options[:database]} -c \"\\#{insert_data_sql}\""
+
+      `#{insert_data_sql}`
+      `PGPASSWORD=""`
+    end
+    
+    puts "\nTable `#{$options[:table]}` loaded \n\n"
+  end
+
+  private
+  def query(*query_str)
+    ActiveRecord::Base.connection.execute(query_str.join("; "))
+  end
+
+  def local?
+    return ['localhost', '127.0.0.1'].include?($options[:host])
+  end
+end
+
+begin
+  e = MyParser.new
+  e.run
+rescue Exception => ex
+  puts "\n\n*********** ERROR ***********\n#{ex.message}\n\n"
+  exit
+end

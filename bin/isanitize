@@ -1,0 +1,4 @@
+file = ARGV[0]
+s = IO.read(file)
+s = s.encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '')
+File.open(file, 'wb') {|f| f.write(s)}

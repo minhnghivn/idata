@@ -1,0 +1,179 @@
+# DATA LOADER
+#
+# @author Nghi Pham
+# @date April 2014
+#
+# The script loads data from a fixed-width text file or a CSV file and fills in
+# a corresponding table in the specified database
+# Issue ruby load.rb --help for guideline/examples
+#
+require 'optparse'
+require 'csv'
+require 'active_record'
+require 'rubygems'
+require 'digest/sha1'
+require 'fileutils'
+
+SUPPORTED_INPUT_FORMATS = ['CSV']
+POSTGRESQL_PORT = 5432
+CSV_DEFAULT_DELIMITER = ','
+CSV_ROW_SEP = "\r\n"
+
+$options = {}
+parser = OptionParser.new("", 24) do |opts|
+  opts.banner = "\nProgram: Data Exporter\nAuthor: MCKI\n\n"
+
+  opts.on("-f", "--format FORMAT", "Output file format") do |v|
+    $options[:format] = v
+  end
+
+  opts.on("--[no-]headers", "Whether or not export the header") do |v|
+    $options[:headers] = v
+  end
+  
+  opts.on("--[no-]quotes", "Quote null values") do |v|
+    $options[:quotes] = v
+  end
+
+  opts.on("--delim DELIMITER", "CSV delimiter") do |v|
+    $options[:delim] = v
+  end
+
+  opts.on("--linebreak CHAR", "") do |v|
+    $options[:linebreak] = v
+  end
+
+  opts.on("-t", "--table TABLE", "Table name to be created") do |v|
+    $options[:table] = v
+  end
+
+  opts.on("-s", "--select FIELDS", "Fields to export") do |v|
+    $options[:select] = v
+  end
+
+  opts.on("-w", "--where CONDITION", "CONDITION") do |v|
+    $options[:where] = v
+  end
+
+  opts.on("-o", "--output FILE", "Output file") do |v|
+    $options[:output] = v
+  end
+
+  opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
+    $options[:host] = v
+  end
+
+  opts.on("-d", "--database DATABASE", "PostgreSQL database") do |v|
+    $options[:database] = v
+  end
+
+  opts.on("-u", "--username USER", "PostgreSQL username") do |v|
+    $options[:username] = v
+  end
+
+  opts.on("-p", "--password PASSWORD", "PostgreSQL password") do |v|
+    $options[:password] = v
+  end
+
+  opts.on("-l", "--listen PORT", "PostgreSQL listen port (default to 5432)") do |v|
+    $options[:listen] = v
+  end
+
+  opts.on_tail('--help', 'Displays this help') do
+		puts opts, "", help
+    exit
+	end
+end
+
+def help
+  return <<-eos
+
+EXAMPLES
+-------------------------------------------------------
+    
+  ruby export.rb --host=localhost --username=postgres --database=db --table=items \\
+                 --output=/tmp/data.csv --format=csv --delim="\\t" --linebreak=$'\\r\\n' \\
+                 --select="id, name AS vendor_name, age" --where="active = 1"
+
+eos
+end
+
+begin
+  parser.parse!
+rescue SystemExit => ex
+  exit
+end
+
+if $options[:format].nil?
+  puts "\nPlease specify input file format: -f\n\n"
+  exit
+end
+
+# downcase for consistency
+$options[:format].upcase!
+
+if !SUPPORTED_INPUT_FORMATS.include?($options[:format])
+  puts "\nInvalid input file format, supported formats are: #{SUPPORTED_INPUT_FORMATS.join(', ')}\n\n"
+  exit
+end
+
+if $options[:table].nil?
+  puts "\nPlease specify SQL table name: -t\n\n"
+  exit
+end
+
+if $options[:output].nil?
+  puts "\nPlease specify output file: -o\n\n"
+  exit
+end
+
+if $options[:host].nil?
+  puts "\nPlease specify host name: -h\n\n"
+  exit
+end
+
+if $options[:database].nil?
+  puts "\nPlease specify PostgreSQL database name: -d\n\n"
+  exit
+end
+
+if $options[:username].nil?
+  puts "\nPlease specify PostgreSQL username: -d\n\n"
+  exit
+end
+
+# Default value
+$options[:listen] ||= POSTGRESQL_PORT
+$options[:delim] ||= CSV_DEFAULT_DELIMITER
+$options[:linebreak] ||= CSV_ROW_SEP
+$options[:delim] = "\t" if $options[:delim] == '\t'
+$options[:headers] ||= false
+$options[:quotes] ||= false
+$options[:select] ||= '*'
+$options[:where] ||= 'true'
+
+#$options = {host: 'localhost', database: 'db', username: 'postgres', password: 'postgres', table: 'products', listen: 5432}
+ActiveRecord::Base.establish_connection(
+  'adapter' => 'postgresql',
+  'host' => $options[:host],
+  'database' => $options[:database],
+  'username' => $options[:username],
+  'password' => $options[:password],
+  'port' => $options[:listen],
+  'timeout' => 15000
+)
+
+class Product < ActiveRecord::Base
+  self.table_name = $options[:table]
+end
+
+CSV.open($options[:output], "wb", :col_sep => $options[:delim], :row_sep => $options[:linebreak], :force_quotes => $options[:quotes]) do |csv|
+  scope = Product.select($options[:select]).where($options[:where])
+  csv << scope.first.attributes.keys if $options[:headers]
+  
+  scope.each do |item|
+    csv << item.attributes.values
+  end
+end
+
+puts "\nFile #{$options[:output]} created!\n\n"

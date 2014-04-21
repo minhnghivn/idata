@@ -1,0 +1,107 @@
+# DATA PATCHER
+#
+# @author Nghi Pham
+# @date April 2014
+#
+# Any custom patches to the database goes here
+#
+require 'optparse'
+require 'csv'
+require 'active_record'
+require 'rubygems'
+
+# Default values
+POSTGRESQL_PORT = 5432
+
+# User input
+$options = {}
+parser = OptionParser.new("", 24) do |opts|
+  opts.banner = "\nProgram: Data Patcher\nAuthor: MCKI\n\n"
+
+  opts.on("-q", "--query QUERY", "Custom query") do |v|
+    $options[:query] = v
+  end
+
+  opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
+    $options[:host] = v
+  end
+
+  opts.on("-d", "--database DATABASE", "PostgreSQL database") do |v|
+    $options[:database] = v
+  end
+
+  opts.on("-u", "--username USER", "PostgreSQL username") do |v|
+    $options[:username] = v
+  end
+
+  opts.on("-p", "--password PASSWORD", "PostgreSQL password") do |v|
+    $options[:password] = v
+  end
+
+  opts.on("-l", "--listen PORT", "PostgreSQL listen port (default to 5432)") do |v|
+    $options[:listen] = v
+  end
+
+  opts.on_tail('--help', 'Displays this help') do
+		puts opts, "", help
+    exit
+	end
+end
+
+def help
+  return <<-eos
+
+EXAMPLES
+-------------------------------------------------------
+Send custom SQL to a data table
+
+    ruby patch.rb --host=localhost --username=postgres --password=postgres --database=db \\
+                  --query="ALTER TABLE vendors ADD COLUMN tmp text; UPDATE vendors SET tmp = vendor_number"
+
+eos
+end
+
+begin
+  parser.parse!
+rescue SystemExit => ex
+  exit
+end
+
+if $options[:query].nil?
+  puts "\nPlease specify SQL query: -q\n\n"
+  exit
+end
+
+if $options[:host].nil?
+  puts "\nPlease specify host name: -h\n\n"
+  exit
+end
+
+if $options[:database].nil?
+  puts "\nPlease specify PostgreSQL database name: -d\n\n"
+  exit
+end
+
+if $options[:username].nil?
+  puts "\nPlease specify PostgreSQL username: -d\n\n"
+  exit
+end
+
+# Default value
+$options[:listen] ||= POSTGRESQL_PORT
+
+# Database
+ActiveRecord::Base.establish_connection(
+  'adapter' => 'postgresql',
+  'host' => $options[:host],
+  'database' => $options[:database],
+  'username' => $options[:username],
+  'password' => $options[:password],
+  'port' => $options[:listen],
+  'timeout' => 15000
+)
+
+# Execute the query, use it at your own risk!!!
+ActiveRecord::Base.connection.execute($options[:query])
+
+puts "\nDone!\n\n"
