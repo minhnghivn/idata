@@ -211,7 +211,7 @@ class MyParser
     headers.map!{|s| s.downcase.strip }
 
     # Write
-    CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER, quote_char: "\b") do |csv|
+    CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER) do |csv|
       csv << headers
 
       data.each_with_index{|s, index|
@@ -268,7 +268,7 @@ class MyParser
     
     insert_data_sql = headers.map{|e| "\"#{e}\""}.join(",")
     insert_data_sql = "COPY #{$options[:table]}( #{insert_data_sql} ) FROM '#{csv_path}' DELIMITER #{tab} CSV HEADER QUOTE #{quote};"
-    
+
     # Change output file permission so that postgres user can read it
     begin
       FileUtils.chmod 0755, csv_path
