@@ -22,7 +22,8 @@ $options = {
   :not_null => [],
   :match => [],
   :not_match => [],
-  :cross_reference => []
+  :cross_reference => [],
+  :query => []
 }
 parser = OptionParser.new("", 24) do |opts|
   opts.banner = "\nProgram: Data Validator\nAuthor: MCKI\n\n"
@@ -45,6 +46,10 @@ parser = OptionParser.new("", 24) do |opts|
 
   opts.on("--cross-reference EXPR", "Reference") do |v|
     $options[:cross_reference] << v
+  end
+  
+  opts.on("--query QUERY", "Custom query") do |v|
+    $options[:query] << v
   end
 
   opts.on("-t", "--table TABLE", "Table to verify") do |v|
@@ -256,3 +261,22 @@ $options[:cross_reference].each do |value|
   
   ActiveRecord::Base.connection.execute(ref_sql)
 end
+
+# --------------------------------------------------------------------
+# Custom validation
+# --------------------------------------------------------------------
+$options[:query].each do |query|
+  puts "Checking with custom query: #{query}"
+
+  # @todo: poor performance here, think of a better SQL!!!
+  custom_sql = <<-eos
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('custom-validation', ' || '), ' || ')
+    WHERE NOT #{query}
+  eos
+  
+  ActiveRecord::Base.connection.execute(custom_sql)
+end
+
+
+
+
