@@ -54,6 +54,10 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("-t", "--table TABLE", "Table name to be created") do |v|
     $options[:table] = v
   end
+  
+  opts.on("--append", "") do |v|
+    $options[:append] = v
+  end
 
   opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
     $options[:host] = v
@@ -155,6 +159,9 @@ end
 $options[:listen] ||= POSTGRESQL_PORT
 $options[:delim] ||= CSV_DEFAULT_DELIMITER
 $options[:quote] ||= CSV_DEFAULT_QUOTE
+$options[:append] ||= false
+
+p $options[:append]
 
 $tmpfile = "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
 
@@ -242,9 +249,15 @@ class MyParser
     end
 
     # Create table
+    if !$options[:append]
+      drop_table_sql = "drop table if exists #{$options[:table]};"
+    else
+      drop_table_sql = ""
+    end
+    
     create_table_sql = headers.map{|e| "\"#{e}\" text"}.join(",")
-    create_table_sql = "drop table if exists #{$options[:table]}; create table #{$options[:table]}( id serial not null, #{create_table_sql} );"
-    query(create_table_sql)
+    create_table_sql = "create table if not exists #{$options[:table]}( id serial not null, #{create_table_sql} );"
+    query(drop_table_sql, create_table_sql)
 
     # Dump data
     #pg_tab = "E'\t'" if $options[:delim] == "\t"
