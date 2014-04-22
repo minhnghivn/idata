@@ -19,14 +19,6 @@ POSTGRESQL_PORT = 5432
 CSV_DEFAULT_DELIMITER = ','
 CSV_DEFAULT_QUOTE = '"'
 
-PG_TAB = "E'\t'"
-PG_BACKSPACE = "E'\b'"
-
-PG_CHAR_MAP = {
-  "\t" => PG_TAB,
-  "\b" => PG_BACKSPACE
-}
-
 $options = {}
 parser = OptionParser.new("", 24) do |opts|
   opts.banner = "\nProgram: Data Loader\nAuthor: MCKI\n\n"
@@ -195,8 +187,20 @@ class MyParser
   end
 
   def load_csv
-    # Copy file to /tmp/ folder to prevent Permission Error 
-    FileUtils.cp $options[:input], $tmpfile
+    # Load CSV data from input file to a temp array    
+    csv_data = []
+    CSV.foreach($options[:input], :col_sep => $options[:delim], :quote_char => $options[:quote]) do |csv|
+      csv_data << csv
+    end
+    
+    # Serialize array into a new CSV (with standard delimiter, quote) for later use with PostgreSQL
+    CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE) do |writer|
+      csv_data.each do |csv|
+        writer << csv
+      end
+    end
+    
+    # Send to PostgreSQL
     create_table_from_csv($tmpfile)
   end
 
@@ -211,21 +215,21 @@ class MyParser
     headers.map!{|s| s.downcase.strip }
 
     # Write
-    CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER) do |csv|
+    CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE) do |csv|
       csv << headers
-
       data.each_with_index{|s, index|
         record = s.unpack(ranges).map{|e| e.strip}
         csv << record
       }
     end
-
+    
+    # Send to PostgreSQL
     create_table_from_csv($tmpfile)
   end
 
   def create_table_from_csv(csv_path)
     # Get headers
-    csv = CSV.open(csv_path, :headers => true, :col_sep => $options[:delim], quote_char: "\b")
+    csv = CSV.open(csv_path, :headers => true, :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE)
     
     first = csv.first
     unless first
@@ -256,19 +260,10 @@ class MyParser
     create_table_sql = headers.map{|e| "\"#{e}\" text"}.join(",")
     create_table_sql = "create table if not exists #{$options[:table]}( id serial not null, #{create_table_sql} );"
     query(drop_table_sql, create_table_sql)
-
-    # Dump data
-    #pg_tab = "E'\t'" if $options[:delim] == "\t"
-
-    tab = PG_CHAR_MAP[$options[:delim]]
-    tab ||= "'#{$options[:delim]}'"
-
-    quote = PG_CHAR_MAP[$options[:quote]]
-    quote = "'#{$options[:quote]}'"
     
     insert_data_sql = headers.map{|e| "\"#{e}\""}.join(",")
-    insert_data_sql = "COPY #{$options[:table]}( #{insert_data_sql} ) FROM '#{csv_path}' DELIMITER #{tab} CSV HEADER QUOTE #{quote};"
-
+    insert_data_sql = "COPY #{$options[:table]}( #{insert_data_sql} ) FROM '#{csv_path}' DELIMITER ',' CSV HEADER"
+    
     # Change output file permission so that postgres user can read it
     begin
       FileUtils.chmod 0755, csv_path
