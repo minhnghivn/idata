@@ -18,6 +18,7 @@ SUPPORTED_INPUT_FORMATS = ['CSV']
 POSTGRESQL_PORT = 5432
 CSV_DEFAULT_DELIMITER = ','
 CSV_ROW_SEP = "\r\n"
+CSV_DEFAULT_QUOTE_CHAR = '"'
 
 $options = {}
 parser = OptionParser.new("", 24) do |opts|
@@ -31,8 +32,16 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:headers] = v
   end
   
+  opts.on("--[no-]quote-empty", "Whether or not export the header") do |v|
+    $options[:quote_empty] = v
+  end
+  
   opts.on("--[no-]quotes", "Quote null values") do |v|
     $options[:quotes] = v
+  end
+  
+  opts.on("--quote-char CHAR", "Quote null values") do |v|
+    $options[:quote_char] = v
   end
 
   opts.on("--delim DELIMITER", "CSV delimiter") do |v|
@@ -146,9 +155,11 @@ end
 $options[:listen] ||= POSTGRESQL_PORT
 $options[:delim] ||= CSV_DEFAULT_DELIMITER
 $options[:linebreak] ||= CSV_ROW_SEP
+$options[:quote_char] ||= CSV_DEFAULT_QUOTE_CHAR
 $options[:delim] = "\t" if $options[:delim] == '\t'
 $options[:headers] ||= false
 $options[:quotes] ||= false
+$options[:quote_empty] ||= false
 $options[:select] ||= '*'
 $options[:where] ||= 'true'
 
@@ -167,12 +178,17 @@ class Product < ActiveRecord::Base
   self.table_name = $options[:table]
 end
 
-CSV.open($options[:output], "wb", :col_sep => $options[:delim], :row_sep => $options[:linebreak], :force_quotes => $options[:quotes]) do |csv|
+CSV.open($options[:output], "wb", :quote_char => $options[:quote_char], :col_sep => $options[:delim], :row_sep => $options[:linebreak], :force_quotes => $options[:quotes]) do |csv|
   scope = Product.select($options[:select]).where($options[:where])
   csv << scope.first.attributes.keys if $options[:headers]
   
   scope.each do |item|
-    csv << item.attributes.values
+    attrs = item.attributes.values
+    if $options[:quote_empty]
+      attrs.map!{|e| e == "" ? nil : e }
+    end
+    
+    csv << attrs
   end
 end
 
