@@ -161,8 +161,6 @@ $options[:delim] ||= CSV_DEFAULT_DELIMITER
 $options[:quote] ||= CSV_DEFAULT_QUOTE
 $options[:append] ||= false
 
-p $options[:append]
-
 $tmpfile = "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
 
 # Database dump
