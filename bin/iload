@@ -85,15 +85,10 @@ EXAMPLES
 Load data from text file and store to a table name "vendors"
 
     ruby load.rb --host=localhost --username=postgres --password=postgres \\
-                 --input=/home/administrator/VendorMaster.txt --format=fx \\
-                 --table=vendors --database=db
+                 --database=db --table=vendors \\
+                 --input=/home/administrator/VendorMaster.txt \\
+                 --format=CSV --delim=$'\\t'
 
-
-The same usage in short form:
-  
-    ruby load.rb -h localhost -u postgres -p postgres \\
-                 -i /home/administrator/VendorMaster.txt -f fx \\
-                 -t vendors -d db
 
 eos
 end
