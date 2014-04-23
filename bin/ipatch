@@ -55,8 +55,8 @@ EXAMPLES
 -------------------------------------------------------
 Send custom SQL to a data table
 
-    ruby patch.rb --host=localhost --username=postgres --password=postgres --database=db \\
-                  --query="ALTER TABLE vendors ADD COLUMN tmp text; UPDATE vendors SET tmp = vendor_number"
+    ipatch --host=localhost --username=postgres --password=postgres --database=db \\
+           --query="ALTER TABLE vendors ADD COLUMN tmp text; UPDATE vendors SET tmp = vendor_number"
 
 eos
 end

@@ -66,9 +66,9 @@ EXAMPLES
 -------------------------------------------------------
 Run a custom Ruby command on the every record represented by the `item` variable
 
-    ruby eval.rb --host=localhost --username=postgres --password=postgres \\
-                 --table=vendors --database=db \\
-                 --eval="item.last_name = item.full_name.split(/\\s+/).last"
+    ieval --host=localhost --username=postgres --password=postgres \\
+          --table=vendors --database=db \\
+          --eval="item.last_name = item.full_name.split(/\\s+/).last"
 
 eos
 end

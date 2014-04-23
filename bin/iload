@@ -84,10 +84,10 @@ EXAMPLES
 -------------------------------------------------------
 Load data from text file and store to a table name "vendors"
 
-    ruby load.rb --host=localhost --username=postgres --password=postgres \\
-                 --database=db --table=vendors \\
-                 --input=/home/administrator/VendorMaster.txt \\
-                 --format=CSV --delim=$'\\t'
+    iload --host=localhost --username=postgres --password=postgres \\
+          --database=db --table=vendors \\
+          --input=/home/administrator/VendorMaster.txt \\
+          --format=CSV --delim=$'\\t'
 
 
 eos

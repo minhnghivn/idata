@@ -100,9 +100,9 @@ def help
 EXAMPLES
 -------------------------------------------------------
     
-  ruby export.rb --host=localhost --username=postgres --database=db --table=items \\
-                 --output=/tmp/data.csv --format=csv --delim="\\t" --linebreak=$'\\r\\n' \\
-                 --select="id, name AS vendor_name, age" --where="active = 1"
+  iexport --host=localhost --username=postgres --database=db --table=items \\
+          --output=/tmp/data.csv --format=csv --delim="\\t" --linebreak=$'\\r\\n' \\
+          --select="id, name AS vendor_name, age" --where="active = 1"
 
 eos
 end

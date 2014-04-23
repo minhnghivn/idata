@@ -93,17 +93,17 @@ EXAMPLES
 -------------------------------------------------------
 Validate `mfrs` table against several rules and write error logs to errors field:
 
-    ruby validate.rb -h localhost -u postgres -p postgres -d db \\
-                --table=mfrs \\
-                --log-to=errors \\
-                --unique="mfr_lic" \\
-                --unique="mfr_number" \\
-                --not-null="mfr_number" \\
-                --not-null="mfr_lic" \\
-                --match="mfr_number/^2.*/" \\
-                --match="mfr_name/^[a-zA-Z]+/" \\
-                --not-match="status/(failed|inactive|wrong)/" \\
-                --query="start_date <= end_date"
+    ivalidate -h localhost -u postgres -p postgres -d db \\
+              --table=mfrs \\
+              --log-to=errors \\
+              --unique="mfr_lic" \\
+              --unique="mfr_number" \\
+              --not-null="mfr_number" \\
+              --not-null="mfr_lic" \\
+              --match="mfr_number/^2.*" \\
+              --match="mfr_name/^[a-zA-Z]+/" \\
+              --not-match="status/(failed|inactive|wrong)/" \\
+              --query="start_date <= end_date"
 
 eos
 end
