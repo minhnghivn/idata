@@ -184,7 +184,7 @@ CSV.open($options[:output], "wb", :quote_char => $options[:quote_char], :col_sep
   
   scope.each do |item|
     attrs = item.attributes.values
-    if $options[:quote_empty]
+    if !$options[:quote_empty]
       attrs.map!{|e| e == "" ? nil : e }
     end
     

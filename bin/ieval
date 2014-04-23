@@ -101,7 +101,7 @@ if $options[:database].nil?
 end
 
 if $options[:username].nil?
-  puts "\nPlease specify PostgreSQL username: -d\n\n"
+  puts "\nPlease specify PostgreSQL username: -u\n\n"
   exit
 end
 
