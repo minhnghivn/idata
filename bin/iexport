@@ -180,7 +180,14 @@ end
 
 CSV.open($options[:output], "wb", :quote_char => $options[:quote_char], :col_sep => $options[:delim], :row_sep => $options[:linebreak], :force_quotes => $options[:quotes]) do |csv|
   scope = Product.select($options[:select]).where($options[:where])
-  csv << scope.first.attributes.keys if $options[:headers]
+  first = scope.first
+  
+  if first
+    csv << first.attributes.keys if $options[:headers]
+  else
+    # only use .column_names when table is empty, to ensure fields match values
+    csv << Product.column_names if $options[:headers]
+  end
   
   scope.each do |item|
     attrs = item.attributes.values
