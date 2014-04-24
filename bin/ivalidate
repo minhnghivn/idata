@@ -267,11 +267,17 @@ end
 # Custom validation
 # --------------------------------------------------------------------
 $options[:query].each do |query|
+  if query.split("--").count > 1
+    message = query.split("--").last.strip
+  else
+    message = "custom-validation"
+  end
+  
   puts "Checking with custom query: #{query}"
 
   # @todo: poor performance here, think of a better SQL!!!
   custom_sql = <<-eos
-    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('custom-validation', ' || '), ' || ')
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{message}', ' || '), ' || ')
     WHERE NOT #{query}
   eos
   
