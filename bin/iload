@@ -14,7 +14,7 @@ require 'rubygems'
 require 'digest/sha1'
 require 'fileutils'
 
-SUPPORTED_INPUT_FORMATS = ['CSV', 'FX']
+SUPPORTED_INPUT_FORMATS = ['CSV', 'FX', 'RPT']
 POSTGRESQL_PORT = 5432
 CSV_DEFAULT_DELIMITER = ','
 CSV_DEFAULT_QUOTE = '"'
@@ -33,6 +33,10 @@ parser = OptionParser.new("", 24) do |opts|
 
   opts.on("--delim DELIMITER", "Field DELIMITER (for CSV format only - default to COMMA ',')") do |v|
     $options[:delim] = v
+  end
+  
+  opts.on("--null NULL", "") do |v|
+    $options[:null] = v
   end
 
   opts.on("--quote QUOTE", "Default to '\"'") do |v|
@@ -161,6 +165,14 @@ ActiveRecord::Base.establish_connection(
   'timeout' => 15000
 )
 
+$csv_converters = []
+$csv_converters << :null_converter if $options[:null]
+
+CSV::Converters[:null_converter] = lambda{ |s|
+  return nil if s == $options[:null]
+  return s
+}
+
 class String
   def underscore
     return self if self.nil?
@@ -177,14 +189,14 @@ class MyParser
   end
 
   def run  
-    load_fx if $options[:format] == 'FX'
+    load_fx if $options[:format] == 'FX' || $options[:format] == 'RPT'
     load_csv if $options[:format] == 'CSV'
   end
 
   def load_csv
     # Load CSV data from input file to a temp array    
     csv_data = []
-    CSV.foreach($options[:input], :col_sep => $options[:delim], :quote_char => $options[:quote]) do |csv|
+    CSV.foreach($options[:input], :col_sep => $options[:delim], :quote_char => $options[:quote], :converters => $csv_converters) do |csv|
       csv_data << csv
     end
     
@@ -214,6 +226,13 @@ class MyParser
       csv << headers
       data.each_with_index{|s, index|
         record = s.unpack(ranges).map{|e| e.strip}
+        
+        # take advantage of CSV converters
+        $csv_converters.each {|converter|
+          converter_lambda = CSV::Converters[converter]
+          record.map!(&converter_lambda)
+        }
+        
         csv << record
       }
     end
