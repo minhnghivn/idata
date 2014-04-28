@@ -182,8 +182,6 @@ end
 
 $options[:select] = [$options[:select].split(/\s*,\s*/) + $options[:include].split(/\s*,\s*/)].join(", ")
 
-p $options[:select]
-
 #$options = {host: 'localhost', database: 'db', username: 'postgres', password: 'postgres', table: 'products', listen: 5432}
 ActiveRecord::Base.establish_connection(
   'adapter' => 'postgresql',
