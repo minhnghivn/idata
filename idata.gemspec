@@ -9,8 +9,8 @@ Gem::Specification.new do |spec|
   spec.authors       = ["Nghi Pham"]
   spec.email         = ["minhnghivn@gmail.com"]
   spec.description   = %q{Tools for importing data from raw files}
-  spec.summary       = %q{Tools for importing data from raw files}
-  spec.homepage      = ""
+  spec.summary       = %q{Tools include: iload, ivalidate, isanitize, ipatch, ieval, iexport}
+  spec.homepage      = "http://bolero.vn"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files`.split($/)
@@ -19,9 +19,9 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
   
-  spec.add_development_dependency "bundler", ">= 1.3"
-  spec.add_development_dependency "rake", ">= 0.9"
+  spec.add_development_dependency "bundler", "~> 1.3"
+  spec.add_development_dependency "rake", "~> 10.0"
 
-  spec.add_dependency "rails", ">= 4.0"
-  spec.add_dependency "pg"
+  spec.add_dependency "rails", "~> 4.0"
+  spec.add_dependency "pg", "~> 0.16"
 end
