@@ -219,3 +219,4 @@ CSV.open($options[:output], "wb", :quote_char => $options[:quote_char], :col_sep
 end
 
 puts "\nFile #{$options[:output]} created!\n\n"
+

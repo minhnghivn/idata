@@ -179,7 +179,7 @@ $options[:unique].each do |field|
   puts "Checking unique fields: #{field}"
 
   uniq_sql = <<-eos
-    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} not unique', ' || '), ' || ')
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} is not unique', ' || '), ' || ')
     WHERE #{field} IN (
       SELECT #{field} FROM #{$options[:table]} GROUP BY #{field}
       HAVING count(*) > 1
@@ -196,7 +196,7 @@ $options[:not_null].each do |field|
   puts "Checking not-null fields: #{field}"
 
   not_null_sql = <<-eos
-    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} null', ' || '), ' || ')
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} is null', ' || '), ' || ')
     WHERE #{field} IS NULL OR length(trim(#{field})) = 0;
   eos
   
@@ -212,7 +212,7 @@ $options[:match].each do |value|
   puts "Checking REGEXP matching: #{regexp}"
 
   match_sql = <<-eos
-    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} not match [#{regexp.gsub("'", "''")}]', ' || '), ' || ')
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} does not match [#{regexp.gsub("'", "''")}]', ' || '), ' || ')
     WHERE #{field} IS NOT NULL AND length(trim(#{field})) <> 0 AND #{field} !~ '#{regexp}';
   eos
   
@@ -228,7 +228,7 @@ $options[:not_match].each do |value|
   puts "Checking REGEXP not matching: #{regexp}"
 
   not_match_sql = <<-eos
-    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} match [#{regexp.gsub("'", "''")}]', ' || '), ' || ')
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} does match [#{regexp.gsub("'", "''")}]', ' || '), ' || ')
     WHERE #{field} IS NOT NULL AND length(trim(#{field})) <> 0 AND #{field} ~ '#{regexp}';
   eos
   
@@ -254,7 +254,7 @@ $options[:cross_reference].each do |value|
 
   # @todo: poor performance here, think of a better SQL!!!
   ref_sql = <<-eos
-    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} not referenced to #{values[1]}.#{values[2]}', ' || '), ' || ')
+    UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} does not reference #{values[1]}.#{values[2]}', ' || '), ' || ')
     WHERE #{field} NOT IN (
       SELECT #{ref_field} FROM #{ref_table}
     ) AND #{field} IS NOT NULL AND length(trim(#{field})) <> 0;
