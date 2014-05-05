@@ -1,0 +1,88 @@
+# DATA LOADER
+#
+# @author Nghi Pham
+# @date April 2014
+#
+# The script loads data from a fixed-width text file or a CSV file and fills in
+# a corresponding table in the specified database
+# Issue ruby load.rb --help for guideline/examples
+#
+require 'optparse'
+require 'csv'
+require 'spreadsheet'
+require 'fileutils'
+
+
+CSV_DEFAULT_DELIMITER = ','
+CSV_DEFAULT_QUOTE = '"'
+
+$options = {input: []}
+parser = OptionParser.new("", 24) do |opts|
+  opts.banner = "\nProgram: Data Exporter\nAuthor: Nghi Pham\n\n"
+
+  opts.on("-o", "--output OUT.xls", "") do |v|
+    $options[:output] = v
+  end
+  
+  opts.on("--i", "--input NAME|PATH", "") do |v|
+    $options[:input] << v
+  end
+  
+  opts.on("--delim DELIMITER", "Field DELIMITER (for CSV format only - default to COMMA ',')") do |v|
+    $options[:delim] = v
+  end
+  
+  opts.on("--quote QUOTE", "Default to '\"'") do |v|
+    $options[:quote] = v
+  end
+
+  opts.on_tail('--help', 'Displays this help') do
+		puts opts, ""
+    exit
+	end
+end
+
+begin
+  parser.parse!
+rescue SystemExit => ex
+  exit
+end
+
+if $options[:input].empty?
+  puts "\nPlease specify input: -i\n\n"
+  exit
+end
+
+if $options[:output].nil?
+  puts "\nPlease specify output: -o\n\n"
+  exit
+end
+
+$options[:input].map!{|e| 
+  { 
+    name: e.split(":")[0].strip,
+    path: e.split(":")[1].strip
+  }
+}
+$options[:delim] ||= CSV_DEFAULT_DELIMITER
+$options[:quote] ||= CSV_DEFAULT_QUOTE
+
+book = Spreadsheet::Workbook.new
+
+$options[:input].each do |e|
+  sheet = book.create_worksheet :name => e[:name]
+  CSV.read(e[:path], :col_sep => $options[:delim], :quote_char => $options[:quote]).each_with_index do |row, i|
+    sheet.row(i).replace(row)
+  end
+end
+
+book.write $options[:output]
+
+
+
+
+
+
+
+
+
