@@ -22,7 +22,7 @@ CSV_DEFAULT_QUOTE_CHAR = '"'
 
 $options = {}
 parser = OptionParser.new("", 24) do |opts|
-  opts.banner = "\nProgram: Data Exporter\nAuthor: MCKI\n\n"
+  opts.banner = "\nProgram: Data Exporter\nAuthor: Nghi Pham\n\n"
 
   opts.on("-f", "--format FORMAT", "Output file format") do |v|
     $options[:format] = v
@@ -42,6 +42,10 @@ parser = OptionParser.new("", 24) do |opts|
   
   opts.on("--quote-char CHAR", "Quote null values") do |v|
     $options[:quote_char] = v
+  end
+  
+  opts.on("--query QUERY", "Custom query") do |v|
+    $options[:query] = v
   end
 
   opts.on("--delim DELIMITER", "CSV delimiter") do |v|
@@ -198,7 +202,12 @@ class Product < ActiveRecord::Base
 end
 
 CSV.open($options[:output], "wb", :quote_char => $options[:quote_char], :col_sep => $options[:delim], :row_sep => $options[:linebreak], :force_quotes => $options[:quotes]) do |csv|
-  scope = Product.select($options[:select]).where($options[:where])
+  if $options[:query]
+    scope = Product.find_by_sql($options[:query])
+  else
+    scope = Product.select($options[:select]).where($options[:where])
+  end
+  
   first = scope.first
   
   if first
