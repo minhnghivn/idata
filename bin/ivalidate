@@ -209,7 +209,7 @@ end
 $options[:match].each do |value|
   field = value[/^[^\/]+/]
   regexp = value[/(?<=\/).*(?=\/)/]
-  puts "Checking REGEXP matching: #{regexp}"
+  puts "Checking REGEXP matching: #{field} ~ #{regexp}"
 
   match_sql = <<-eos
     UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} does not match [#{regexp.gsub("'", "''")}]', ' || '), ' || ')
