@@ -70,6 +70,7 @@ $options[:quote] ||= CSV_DEFAULT_QUOTE
 book = Spreadsheet::Workbook.new
 
 $options[:input].each do |e|
+  puts "Loading #{e[:name]}"
   sheet = book.create_worksheet :name => e[:name]
   CSV.read(e[:path], :col_sep => $options[:delim], :quote_char => $options[:quote]).each_with_index do |row, i|
     sheet.row(i).replace(row)

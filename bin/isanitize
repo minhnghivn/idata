@@ -14,6 +14,10 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("--remove CHARCODE", "Unicode code") do |v|
     $options[:remove] << v
   end
+  
+  opts.on("--strip-newline", "") do |v|
+    $options[:strip_newline] = v
+  end
 
   opts.on_tail('--help', 'Displays this help') do
 		puts opts, "", help
@@ -46,7 +50,12 @@ def sanitize(file)
 
   # Remove invalid UTF-8 byte code
   s = s.encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '')
-
+  
+  # remove ending newlines
+  if $options[:strip_newline]
+    s.gsub!(/(\r*\n)$/m, "")
+  end
+  
   # Remove wrong char
   $options[:remove].each do |c|
     s.gsub!([c.to_i].pack("U"), "")
