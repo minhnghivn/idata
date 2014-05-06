@@ -193,7 +193,7 @@ end
 # Check not-null field
 # --------------------------------------------------------------------
 $options[:not_null].each do |field|
-  puts "Checking not-null fields: #{field}"
+  puts "Checking NULL: #{field}"
 
   not_null_sql = <<-eos
     UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} is null', ' || '), ' || ')
@@ -273,7 +273,7 @@ $options[:query].each do |query|
     message = "custom-validation"
   end
   
-  puts "Checking with custom query: #{query}"
+  puts "Checking with custom query: #{query[0..50]}#{query.size > 51 ? "..." : "" }"
 
   # @todo: poor performance here, think of a better SQL!!!
   custom_sql = <<-eos
