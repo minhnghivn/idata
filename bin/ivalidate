@@ -176,7 +176,7 @@ ActiveRecord::Base.connection.execute(pre_sql)
 # Check unique field
 # --------------------------------------------------------------------
 $options[:unique].each do |field|
-  puts "Checking unique fields: #{field}"
+  puts "Checking uniqueness: #{field}"
 
   uniq_sql = <<-eos
     UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} is not unique', ' || '), ' || ')
