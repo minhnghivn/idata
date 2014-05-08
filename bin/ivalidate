@@ -261,7 +261,7 @@ $options[:cross_reference].each do |value|
   ref_sql = <<-eos
     UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} does not reference #{values[1]}.#{values[2]}', ' || '), ' || ')
     WHERE #{field} IN (
-      SELECT #{field} from #{$options[:table]} origin LEFT JOIN #{ref_table} target
+      SELECT origin.#{field} from #{$options[:table]} origin LEFT JOIN #{ref_table} target
       on origin.#{field} = target.#{ref_field}
       where target.#{ref_field} is null
     ) AND #{field} IS NOT NULL AND length(trim(#{field})) <> 0;
