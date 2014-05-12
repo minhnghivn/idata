@@ -21,9 +21,9 @@ CSV_DEFAULT_QUOTE = '"'
 
 $options = {}
 parser = OptionParser.new("", 24) do |opts|
-  opts.banner = "\nProgram: Data Loader\nAuthor: MCKI\n\n"
+  opts.banner = "\nProgram: Data Loader\nAuthor: MCKi Team\nDescription: the program takes an input text file and creates a corresponding data table\n\n"
 
-  opts.on("-i", "--input INPUT", "INPUT text file (fixed-width)") do |v|
+  opts.on("-i", "--input INPUT", "Input text file") do |v|
     $options[:input] = v
   end
 
@@ -35,7 +35,7 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:delim] = v
   end
   
-  opts.on("--null NULL", "") do |v|
+  opts.on("--null VALUE", "Value which is considered NULL") do |v|
     $options[:null] = v
   end
 
