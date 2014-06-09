@@ -37,9 +37,9 @@ parser = OptionParser.new("", 24) do |opts|
   end
 
   opts.on_tail('--help', 'Displays this help') do
-		puts opts, ""
+    puts opts, ""
     exit
-	end
+  end
 end
 
 begin
