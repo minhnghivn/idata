@@ -174,9 +174,17 @@ $options[:quotes] ||= false
 $options[:quote_empty] ||= false
 $options[:select] ||= '*'
 $options[:where] ||= 'true'
-
 $options[:include] ||= ""
 
+# Do not quote the '"' char
+# For example, normally it quotes 
+#       Glove 14" length
+# to 
+#       "Glove 14"" length"
+# The check below prevents this so when --no-quote is set, the output is not quoted
+unless $options[:quotes]
+  $options[:quote_char] = "\0"
+end
 
 if $options[:exclude]
   $options[:exclude] = $options[:exclude].split(/\s*,\s*/)
