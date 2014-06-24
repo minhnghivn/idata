@@ -25,7 +25,7 @@ $options = {
   :cross_reference => [],
   :query => [],
   :rquery => [],
-  :unique_by => []
+  :consistent_by => []
 }
 parser = OptionParser.new("", 24) do |opts|
   opts.banner = "\nProgram: Data Validator\nAuthor: MCKI\n\n"
@@ -34,10 +34,10 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:unique] << v
   end
   
-  opts.on("--unique-by FIELD1|FIELD2", "Check if FIELD1 is unique within the scope of FIELD2") do |v|
-    $options[:unique_by] << v
+  opts.on("--consistent-by F1|F2,F3,F4...", "") do |v|
+    $options[:consistent_by] << v
   end
-
+  
   opts.on("--not-null FIELD", "Check if FIELD is not null or empty") do |v|
     $options[:not_null] << v
   end
@@ -164,6 +164,18 @@ ActiveRecord::Base.establish_connection(
   'timeout' => 15000
 )
 
+class String
+  def not_null_sql
+    a = self.split(/\s*,\s*/)
+    sql = a.map{|s|
+      "#{s} IS NOT NULL AND length(trim(#{s}::text)) <> 0"
+    }.join(" AND ")
+    
+    "(#{sql})"
+  end
+end
+
+
 puts "\nValidating #{$options[:table]}"
 puts "------------------------------------------"
 
@@ -193,11 +205,11 @@ $options[:unique].each do |field|
     puts "Checking uniqueness: #{field}"
 
     uniq_sql = <<-eos
-      UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} is not unique', ' || '), ' || ')
-      WHERE #{field} IN (
-        SELECT #{field} FROM #{$options[:table]} GROUP BY #{field}
+      UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('[#{field}] is not unique', ' || '), ' || ')
+      WHERE id IN (
+        SELECT unnest(array_agg(id)) FROM #{$options[:table]} GROUP BY #{field}
         HAVING count(*) > 1
-      ) AND #{field} IS NOT NULL AND length(trim(#{field})) <> 0;
+      ) AND #{field.not_null_sql};
     eos
     
     ActiveRecord::Base.connection.execute(uniq_sql)
@@ -207,9 +219,9 @@ $options[:unique].each do |field|
 end
 
 # --------------------------------------------------------------------
-# Check unique within scope
+# Check consitent by scope
 # --------------------------------------------------------------------
-$options[:unique_by].each do |fields|
+$options[:consistent_by].each do |fields|
   begin
     fields = fields.split(/\s*\|\s*/)
     
@@ -221,13 +233,14 @@ $options[:unique_by].each do |fields|
     puts "Checking uniqueness: #{f1} | #{f2}"
 
     uniq_sql = <<-eos
-      UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('same #{f2} but with different #{f1}', ' || '), ' || ')
-      WHERE #{f2} IN
+      UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('same [#{f2}] but with different #{f1}', ' || '), ' || ')
+      WHERE id IN
       (
-        SELECT #{f2} FROM #{$options[:table]}
+        SELECT unnest(array_agg(id)) FROM #{$options[:table]}
+        WHERE #{f1.not_null_sql} AND #{f2.not_null_sql}
         GROUP BY #{f2}
         HAVING COUNT(distinct #{f1}) > 1
-      ) AND #{f1} IS NOT NULL AND length(trim(#{f1})) <> 0 AND #{f2} IS NOT NULL AND length(trim(#{f2})) <> 0;
+      );
     eos
     
     ActiveRecord::Base.connection.execute(uniq_sql)
@@ -235,7 +248,6 @@ $options[:unique_by].each do |fields|
     puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
   end
 end
-
 
 # --------------------------------------------------------------------
 # Check not-null field
