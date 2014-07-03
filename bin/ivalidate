@@ -124,6 +124,14 @@ rescue SystemExit => ex
   exit
 end
 
+# Load parameters from ENVIRONMENT if exist
+$options[:host] ||= ENV['HOST']
+$options[:username] ||= ENV['USERNAME']
+$options[:password] ||= ENV['PASSWORD']
+$options[:listen] ||= ENV['LISTEN']
+$options[:database] ||= ENV['DATABASE']
+
+# validate parameters
 if $options[:table].nil?
   puts "\nPlease specify table name: -t\n\n"
   exit
