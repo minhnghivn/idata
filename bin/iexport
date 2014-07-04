@@ -219,7 +219,7 @@ end
 
 CSV.open($options[:output], "wb", :quote_char => $options[:quote_char], :col_sep => $options[:delim], :row_sep => $options[:linebreak], :force_quotes => $options[:quotes]) do |csv|
   if $options[:query]
-    scope = Product.find_by_sql($options[:query])
+    scope = ActiveRecord::Base.connection.execute($options[:query])
   else
     scope = Product.select($options[:select]).where($options[:where])
   end
@@ -227,14 +227,25 @@ CSV.open($options[:output], "wb", :quote_char => $options[:quote_char], :col_sep
   first = scope.first
   
   if first
-    csv << first.attributes.delete_if{|k,v| k.nil? || $options[:exclude].include?(k) }.keys if $options[:headers]
+    if $options[:query]
+      csv << first.delete_if{|k,v| k.nil? || $options[:exclude].include?(k) }.keys if $options[:headers]
+    else
+      csv << first.attributes.delete_if{|k,v| k.nil? || $options[:exclude].include?(k) }.keys if $options[:headers]      
+    end
   else
-    # only use .column_names when table is empty, to ensure fields match values
-    csv << Product.column_names if $options[:headers]
+    unless $options[:query]
+      # only use .column_names when table is empty, to ensure fields match values
+      csv << Product.column_names if $options[:headers]
+    end
   end
   
   scope.each do |item|
-    attrs = item.attributes.delete_if{|k,v| k.nil? || $options[:exclude].include?(k) }.values
+    if $options[:query]
+      attrs = item.delete_if{|k,v| k.nil? || $options[:exclude].include?(k) }.values
+    else
+      attrs = item.attributes.delete_if{|k,v| k.nil? || $options[:exclude].include?(k) }.values
+    end
+    
     if !$options[:quote_empty]
       attrs.map!{|e| e == "" ? nil : e }
     end
