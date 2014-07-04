@@ -64,11 +64,11 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:linebreak] = v
   end
 
-  opts.on("-t", "--table TABLE", "Table name to be created") do |v|
+  opts.on("-t", "--table TABLE", "") do |v|
     $options[:table] = v
   end
 
-  opts.on("-s", "--select FIELDS", "Fields to export") do |v|
+  opts.on("-s", "--select FIELDS", "") do |v|
     $options[:select] = v
   end
 
@@ -146,8 +146,8 @@ if !SUPPORTED_INPUT_FORMATS.include?($options[:format])
   exit
 end
 
-if $options[:table].nil?
-  puts "\nPlease specify SQL table name: -t\n\n"
+if $options[:table].nil? && $options[:query].nil?
+  puts "\nPlease specify SQL table name (-t) or a custom query (-q)\n\n"
   exit
 end
 
