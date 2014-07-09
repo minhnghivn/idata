@@ -72,6 +72,6 @@ Besides `ivalidate`, we also support some other utilities to:
 + Modify data tables
 + Generate summary reports
 
-For a full example, see our `example.sh`
+For a full example, see our `sample.sh`
 
 
