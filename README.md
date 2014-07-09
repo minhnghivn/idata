@@ -1,6 +1,6 @@
 # OVERVIEW
-We provide some utilities which help ease the task of validating data in a PostgreSQL data table
-Those utilities can be used as simple terminal commands and can be installed by:
+We provide some useful utilities for validating data in a PostgreSQL data table
+These utilities can be used as simple terminal commands and can be installed by:
 
     gem install idata
 
@@ -9,16 +9,17 @@ Prequisites include:
 2. Ruby 2.0 or above
 
 # USAGE
-Suppose we have an items table, and we want to validate it against certain criteria like:
+Suppose we have an `items` table, and we want to validate its records against certain criteria like:
 
-* item_id: must not be null
-* item_title: must not be null
-* The composite [item_id, item_title] must be unique
-* One item_id corresponds to only ONE item_title (In other words, there must not be two items with different titles but with the same item_id)
+* `item_id` must not be null
+* `item_title` must not be null
+* The composite `[item_id, item_title]` must be unique
+* One `item_id` corresponds to only ONE `item_title` (In other words, there must not be two items with different titles but with the same `item_id`)
 and vice-versa
-* vendor_code must reference the code column in the vendors table
+* `vendor_code` must reference the code column in the `vendors` table
 
 Then the validation command could be:
+```
       ivalidate --host=localhost --user=postgres --database=mydb --table=items --log-to=validation_errors \
                 --not-null="vendor_id" \
                 --not-null="vendor_name" \
@@ -26,52 +27,51 @@ Then the validation command could be:
                 --consistent-by="vendor_id|vendor_name" \
                 --consistent-by="vendor_id|vendor_name" \
                 --cross-reference="vendor_code|vendors.code"
-
-Validation results for every single record are logged to an additional column named validation_errors
-of the items table (as specified by the --log-to switch)
+```
+Validation results for every single record are logged to an additional column named `validation_errors`
+of the items table (as specified by the `--log-to` switch)
 
 Most common checks can be performed using the supported switches:
+```
     --not-null
     --unique
     --consistent-by
     --cross-reference
-
+```
 For more generic check, we support some other switches:
 
-## --match="field/pattern/"
-Check if values of a field match the provided pattern (which is a regular expression).
+The --match="field/pattern/" switch tells the program to check if values of a `field` matches the provided `pattern` (which is a regular expression).
 For example:
-
+```
     # Check if item_id is a number:
     ivalidate --match="item_id/[0-9]+/"
           
     # Check if value of status is either 'A' or 'I' (any other value is not allowed)
     ivalidate --match="status/^(A|I)$/"
-   
-## --query="expr -- message"
+```
 In case you need even more customized validation other than the supported ones (match, unique, not-null, cross-reference...)
-then --query switch may be helpful. For example:
-
-    --query="string_to_date(start_date) >= '01/02/2014' -- invalid date"
-    
-You can also use --rquery which is the reversed counterpart of --query.
+then `--query` switch may be helpful. For example:
+```
+    ivalidate --query="string_to_date(start_date) >= '01/02/2014' -- invalid date"
+``` 
+You can also use `--rquery` which is the reversed counterpart of `--query`
 For example, the following two checks are equivalent:
+```
+    ivalidate --query="string_to_date(start_date) >= '01/02/2014' -- invalid date"
+    ivalidate --rquery="string_to_date(start_date) < '01/02/2014' -- invalid date"
+``` 
+(mark any record whose `start_date < '01/02/2014'` as "invalid date")
 
-    --query="string_to_date(start_date) >= '01/02/2014' -- invalid date"
-    --rquery="string_to_date(start_date) < '01/02/2014' -- invalid date"
-    
-(mark any record whose start_date < '01/02/2014' as "invalid date")
-
-Note: run ivalidate --help to see the full list of supported switches
+Note: run `ivalidate --help` to see the full list of supported switches
 
 
 # PUT IT ALL TOGETHER
-You can put several ivalidate commands (for several data tables) in one single bash/sh file.
-Besides the ivalidate command, we also support some other utilities to:
+You can put several `ivalidate` commands (for several data tables) in one single bash/sh file.
+Besides `ivalidate`, we also support some other utilities to:
 + Load data from text files to SQL tables
 + Modify the data tables
 + Generate summary reports
 
-For a full example of the validation step-by-step, see our example.sh
+For a full example of the validation step-by-step, see our `example.sh`
 
 
