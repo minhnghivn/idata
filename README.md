@@ -4,9 +4,9 @@ These utilities can be used as simple terminal commands and can be installed by:
 
     gem install idata
 
-Prequisites include:
-1. PostgreSQL 9.0 or above
-2. Ruby 2.0 or above
+Prequisites:
+* PostgreSQL 9.0 or above
+* Ruby 2.0 or above
 
 # USAGE
 Suppose we have an `items` table, and we want to validate its records against certain criteria like:
@@ -14,9 +14,9 @@ Suppose we have an `items` table, and we want to validate its records against ce
 * `item_id` must not be null
 * `item_title` must not be null
 * The composite `[item_id, item_title]` must be unique
-* One `item_id` corresponds to only ONE `item_title` (In other words, there must not be two items with different titles but with the same `item_id`)
+* One `item_id` corresponds to only ONE `item_title` (in other words, there must not be two items with different titles but with the same `item_id`)
 and vice-versa
-* `vendor_code` must reference the code column in the `vendors` table
+* `vendor_code` must reference the `code` column in the `vendors` table
 
 Then the validation command could be:
 ```
@@ -29,9 +29,9 @@ Then the validation command could be:
                 --cross-reference="vendor_code|vendors.code"
 ```
 Validation results for every single record are logged to an additional column named `validation_errors`
-of the items table (as specified by the `--log-to` switch)
+of the `items` table, as specified by the `--log-to` switch
 
-Most common checks can be performed using the supported switches:
+As you can see, most common checks can be performed using the supported switches:
 ```
     --not-null
     --unique
@@ -40,7 +40,7 @@ Most common checks can be performed using the supported switches:
 ```
 For more generic check, we support some other switches:
 
-The --match="field/pattern/" switch tells the program to check if values of a `field` matches the provided `pattern` (which is a regular expression).
+The `--match="field/pattern/"` switch tells the program to check if value of a `field` matches the provided `pattern` (which is a regular expression).
 For example:
 ```
     # Check if item_id is a number:
@@ -69,9 +69,9 @@ Note: run `ivalidate --help` to see the full list of supported switches
 You can put several `ivalidate` commands (for several data tables) in one single bash/sh file.
 Besides `ivalidate`, we also support some other utilities to:
 + Load data from text files to SQL tables
-+ Modify the data tables
++ Modify data tables
 + Generate summary reports
 
-For a full example of the validation step-by-step, see our `example.sh`
+For a full example, see our `example.sh`
 
 
