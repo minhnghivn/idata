@@ -69,6 +69,10 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("--log-to FIELD", "Field to log error to") do |v|
     $options[:log_to] = v
   end
+  
+  opts.on("--pretty", "Use more human-readable error message") do |v|
+    $options[:pretty] = v
+  end
 
   opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
     $options[:host] = v
@@ -270,8 +274,16 @@ $options[:not_null].each do |field|
     eos
     
     ActiveRecord::Base.connection.execute(not_null_sql)
+  
   rescue Exception => ex
-    puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
+    if ex.message.include?('PG::UndefinedColumn')
+      not_null_sql = <<-eos
+        UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('Column `#{field}` is missing', ' || '), ' || ')
+      eos
+      ActiveRecord::Base.connection.execute(not_null_sql)
+    else
+      puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
+    end
   end
 end
 
@@ -283,9 +295,11 @@ $options[:match].each do |value|
     field = value[/^[^\/]+/]
     regexp = value[/(?<=\/).*(?=\/)/]
     puts "Checking REGEXP matching: #{field} ~ #{regexp}"
-
+    
+    msg = $options[:pretty] ? "Invalid #{field}" : "#{field} does not match [#{regexp.gsub("'", "''")}]"
+    
     match_sql = <<-eos
-      UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} does not match [#{regexp.gsub("'", "''")}]', ' || '), ' || ')
+      UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{msg}', ' || '), ' || ')
       WHERE #{field} IS NOT NULL AND length(trim(#{field})) <> 0 AND #{field} !~ '#{regexp}';
     eos
     
