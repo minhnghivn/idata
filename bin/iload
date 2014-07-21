@@ -177,7 +177,7 @@ $csv_converters = []
 $csv_converters << :null_converter if $options[:null]
 
 CSV::Converters[:null_converter] = lambda{ |s|
-  return nil if s == $options[:null]
+  return nil if s == $options[:null] or s == ""
   return s
 }
 
