@@ -94,7 +94,7 @@ ivalidate --table=$ITEM \
 # Step 3 - Generate summary report
 ###################################################################################
 # After the validation step above, an additional field named validation_errors
-# is added to every table. In case the record does not pass a validation creterion, a corresponding error shall be logged to this field
+# is added to every table. In case the record does not pass a validation criterion, a corresponding error shall be logged to this field
 # One record may have more than one error logged
 # 
 # You can simply look at the validation_errors field to see errors associated to a record
@@ -103,7 +103,6 @@ ivalidate --table=$ITEM \
 #    1 Create a summary table which tells us how many errors found, how many records associated with each...
 #    2 Extract the first 1000 sample records for every error
 #    3 Put all together into one single Excel report
-
 
 # 1) Create error summary report table and write to /tmp/summary.csv
 # This can be done using the iexport utility which can generate a CSV file from a data table or from a custom query

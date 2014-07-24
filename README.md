@@ -1,14 +1,26 @@
-# OVERVIEW
+# Overview
 We provide some useful utilities for validating data in a PostgreSQL data table
 These utilities can be used as simple terminal commands and can be installed by:
 
     gem install idata
 
+idata comes along with the following commands:
+* iload
+* ivalidate
+* ipatch
+* ieval
+* iexport
+* imerge
+* isanitize
+
+Run a command with --help switch for the details
+
 Prequisites:
 * PostgreSQL 9.0 or above
 * Ruby 2.0 or above
+* An auto ID field is required for data table to be validated using ivalidate 
 
-# USAGE
+# Usage
 Suppose we have an `items` table, and we want to validate its records against certain criteria like:
 
 * `item_id` must not be null
@@ -65,7 +77,7 @@ For example, the following two checks are equivalent:
 Note: run `ivalidate --help` to see the full list of supported switches
 
 
-# PUT IT ALL TOGETHER
+# Put it all together
 You can put several `ivalidate` commands (for several data tables) in one single bash/sh file.
 Besides `ivalidate`, we also support some other utilities to:
 + Load data from text files to SQL tables

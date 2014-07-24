@@ -73,6 +73,10 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("--pretty", "Use more human-readable error message") do |v|
     $options[:pretty] = v
   end
+  
+  opts.on("--case-insensitive", "Use more human-readable error message") do |v|
+    $options[:case_insensitive] = v
+  end
 
   opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
     $options[:host] = v
@@ -185,6 +189,15 @@ class String
     
     "(#{sql})"
   end
+  
+  def lower
+    a = self.split(/\s*,\s*/)
+    sql = a.map{|s|
+      "lower(#{s})"
+    }.join(",")
+    
+    sql
+  end
 end
 
 
@@ -215,11 +228,15 @@ ActiveRecord::Base.connection.execute(pre_sql)
 $options[:unique].each do |field|
   begin
     puts "Checking uniqueness: #{field}"
-
+    if $options[:case_insensitive]
+      f_lower = field.lower
+    else
+      f_lower = field
+    end
     uniq_sql = <<-eos
       UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('[#{field}] is not unique', ' || '), ' || ')
       WHERE id IN (
-        SELECT unnest(array_agg(id)) FROM #{$options[:table]} GROUP BY #{field}
+        SELECT unnest(array_agg(id)) FROM #{$options[:table]} GROUP BY #{f_lower}
         HAVING count(*) > 1
       ) AND #{field.not_null_sql};
     eos
@@ -239,19 +256,24 @@ $options[:consistent_by].each do |fields|
     
     raise "input must be in field1|field2 format" if fields.count != 2
     
-    f1 = fields.first
-    f2 = fields.last
+    f1_case = f1 = fields.first
+    f2_case = f2 = fields.last
     
-    puts "Checking uniqueness: #{f1} | #{f2}"
+    if $options[:case_insensitive]
+      f1_case = f1_case.lower
+      f2_case = f2_case.lower
+    end
+    
+    puts "Checking consistency: #{f1} | #{f2}"
 
     uniq_sql = <<-eos
-      UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('same [#{f2}] but with different #{f1}', ' || '), ' || ')
+      UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('same [#{f2}] but with different [#{f1}]', ' || '), ' || ')
       WHERE id IN
       (
         SELECT unnest(array_agg(id)) FROM #{$options[:table]}
         WHERE #{f1.not_null_sql} AND #{f2.not_null_sql}
-        GROUP BY #{f2}
-        HAVING COUNT(distinct #{f1}) > 1
+        GROUP BY #{f2_case}
+        HAVING COUNT(distinct #{f1_case}) > 1
       );
     eos
     
@@ -340,19 +362,25 @@ $options[:cross_reference].each do |value|
       raise "Error: Wrong argument for --cross-reference switch"
       exit(0)
     end
-
+    
     field = values[0]
     ref_table = values[1]
     ref_field = values[2]
 
     puts "Checking data integrity: #{value}"
+    
+    if $options[:case_insensitive]
+      join_condition = "on lower(origin.#{field}) = lower(target.#{ref_field})"
+    else
+      join_condition = "on origin.#{field} = target.#{ref_field}"
+    end
 
     # @todo: poor performance here, think of a better SQL!!!
     ref_sql = <<-eos
       UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} does not reference #{values[1]}.#{values[2]}', ' || '), ' || ')
       WHERE #{field} IN (
         SELECT origin.#{field} from #{$options[:table]} origin LEFT JOIN #{ref_table} target
-        on origin.#{field} = target.#{ref_field}
+        #{join_condition}
         where target.#{ref_field} is null
       ) AND #{field} IS NOT NULL AND length(trim(#{field})) <> 0;
     eos
