@@ -3,12 +3,12 @@
 # SHARED VARIABLES
 # ---------------------------------------------------------------------------------
 # Database to store data tables
-ORGNAME="ne20140619"
+ORGNAME="sample"
 
 # ENV variables used by the validation command
 export HOST="localhost"
 export USERNAME="postgres"
-export PASSWORD="postgres"
+export PASSWORD="extr!me"
 export DATABASE="$ORGNAME"
 export LISTEN=5432
 
@@ -455,7 +455,7 @@ ivalidate --case-insensitive --pretty -t $ITEMCOST \
 
 
 ####################################################
-# Create report file for every table
+# Create report file for every table (extract 1000 records for every error)
 # These file will then be used for the Validation Report
 ####################################################
 
