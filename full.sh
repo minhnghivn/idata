@@ -28,6 +28,7 @@ FITEMCOST="ItemCostCenterAcctExceptions.csv"
 FREQ="ReqHistoryLoad.csv"
 FGL="GLAccount.csv"
 FINVENTORY="Inventory.csv"
+FITEMDEFAULTEXP="ItemAndDefaultExpenseAccount.csv"
 
 CONTRACTO="contracts"
 VENDOR="vendors"
@@ -41,6 +42,7 @@ ITEMCOST="item_costs"
 REQ="reqs"
 GL="gls"
 INVENTORY="inventory"
+ITEMDEFAULTEXP="ItemAndDefaultExpenseAccount.csv"
 
 # Standard UOM for reference
 FUOMSTD="stduom.txt"
@@ -67,6 +69,7 @@ iload -i "$FITEMCOST" -t "$ITEMCOST" -f csv
 iload -i "$FREQ" -t "$REQ" -f csv
 iload -i "$FGL" -t "$GL" -f csv
 iload -i "$FINVENTORY" -t "$INVENTORY" -f csv
+iload -i "$FITEMDEFAULTEXP" -t "$ITEMDEFAULTEXP" -f csv
 
 # Load UOM STANDARD for reference
 iload -i "$FUOMSTD" -t "$UOMSTD" -f csv
@@ -170,7 +173,6 @@ ivalidate --case-insensitive --pretty -t $MFR \
        --not-null="mfr_name" \
        --match="mfr_number/[a-zA-Z0-9]/" \
        --match="mfr_name/[a-zA-Z0-9]/" \
-       --consistent-by="mfr_number|mfr_name" \
        --consistent-by="mfr_name|mfr_number" \
        --consistent-by="country_code|country_name" \
        --consistent-by="country_name|country_code"
@@ -266,7 +268,6 @@ ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --match="item_status/^(1|2|3|A|I|Inactive|Active|Y)$/" \
        --consistent-by="corp_id|corp_name" \
        --consistent-by="corp_name|corp_id" \
-       --consistent-by="mfr_number|mfr_name" \
        --consistent-by="mfr_name|mfr_number" \
        --consistent-by="vendor_code|vendor_name" \
        --consistent-by="vendor_name|vendor_code" \
@@ -314,7 +315,6 @@ ivalidate --case-insensitive --pretty -t $ITEM \
        --cross-reference="corp_name|$GL.corp_acct_name" \
        --consistent-by="corp_id|corp_name" \
        --consistent-by="corp_name|corp_id" \
-       --consistent-by="mfr_number|mfr_name" \
        --consistent-by="mfr_name|mfr_number" \
        --consistent-by="vendor_code|vendor_name" \
        --consistent-by="vendor_name|vendor_code" \
@@ -452,6 +452,12 @@ ivalidate --case-insensitive --pretty -t $ITEMCOST \
        --cross-reference="item_no|$ITEM.item_id" \
        --cross-reference="exp_acct_no|$GL.exp_acct_no"
 
+ivalidate --case-insensitive --pretty -t $ITEMDEFAULTEXP \
+       --log-to=validation_errors \
+       --cross-reference="corp_acct_no|$GL.corp_acct_no" \
+       --cross-reference="item_no|$ITEM.item_id" \
+       --cross-reference="exp_acct_no|$GL.exp_acct_no"
+
 
 
 ####################################################
@@ -464,6 +470,14 @@ iexport -t $ITEMCOST \
         --query="select * from (select ROW_NUMBER() OVER (PARTITION BY error) AS group_index, * 
                  FROM ( select unnest(string_to_array(validation_errors, ' || ')) as error, * from
                  $ITEMCOST order by id  ) as main) as tmp
+                 where group_index <= 1000" \
+        --exclude="id, validation_errors, group_index"
+
+iexport -t $ITEMDEFAULTEXP \
+        -o "$OUTPUT_DIR/$ITEMDEFAULTEXP.csv" -f csv --no-quote-empty --quotes --headers \
+        --query="select * from (select ROW_NUMBER() OVER (PARTITION BY error) AS group_index, * 
+                 FROM ( select unnest(string_to_array(validation_errors, ' || ')) as error, * from
+                 $ITEMDEFAULTEXP order by id  ) as main) as tmp
                  where group_index <= 1000" \
         --exclude="id, validation_errors, group_index"
         
@@ -561,12 +575,14 @@ iexport --output="$OUTPUT_DIR/summary.csv" -f csv --no-quote-empty --quotes --he
                  (select 'User' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $USER), 2)::varchar || '%' as percentage from $USER group by error order by error) union
                  (select 'Location' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $LOCATION), 2)::varchar || '%' as percentage from $LOCATION group by error order by error) union
                  (select 'ItemCost' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $ITEMCOST), 2)::varchar || '%' as percentage from $ITEMCOST group by error order by error) union
+                 (select 'ItemAndDefaultEXP' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $ITEMDEFAULTEXP), 2)::varchar || '%' as percentage from $ITEMDEFAULTEXP group by error order by error) union
                  (select 'GLAccount' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $GL), 2)::varchar || '%' as percentage from $GL group by error order by error)"
 
 # Merge summary.xls and report files into one single file with several tabs
 imerge --output=$OUTPUT_DIR/$ORGNAME.xls \
         --input="Summary:$OUTPUT_DIR/summary.csv" \
         --input="ItemCostCenterAcctExceptions:$OUTPUT_DIR/$ITEMCOST.csv" \
+        --input="ItemAndDefaultEXP:$OUTPUT_DIR/$ITEMDEFAULTEXP.csv" \
         --input="ContractMaster:$OUTPUT_DIR/$CONTRACTO.csv" \
         --input="ItemMaster:$OUTPUT_DIR/$ITEM.csv" \
         --input="MfrMaster:$OUTPUT_DIR/$MFR.csv" \
