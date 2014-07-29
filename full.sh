@@ -157,8 +157,7 @@ ivalidate --case-insensitive --pretty -t $VENDOR \
        --log-to=validation_errors \
        --not-null="vendor_code" \
        --not-null="vendor_name" \
-       --unique="vendor_code" \
-       --unique="vendor_name" \
+       --unique="vendor_code, vendor_name" \
        --match="vendor_code/[a-zA-Z0-9]/" \
        --match="vendor_name/[a-zA-Z0-9]/" \
        --consistent-by="vendor_code|vendor_name" \
