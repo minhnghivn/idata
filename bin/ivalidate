@@ -35,11 +35,11 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:unique] << v
   end
   
-  opts.on("--consistent-by F1|F2,F3,F4...", "") do |v|
+  opts.on("--consistent-by F1|F2,F3,F4...", "Check if F1 is uniquely identified by the composite of [F2,F3,F4]") do |v|
     $options[:consistent_by] << v
   end
   
-  opts.on("--not-null FIELD", "Check if FIELD is not null or empty") do |v|
+  opts.on("--not-null FIELD", "Check if FIELD is null or empty") do |v|
     $options[:not_null] << v
   end
 
@@ -51,19 +51,19 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:not_match] << v
   end
 
-  opts.on("--cross-reference EXPR", "Reference") do |v|
+  opts.on("--cross-reference EXPR", "See example") do |v|
     $options[:cross_reference] << v
   end
   
-  opts.on("--query QUERY", "Custom query") do |v|
+  opts.on("--query QUERY", "Custom query (whitelist)") do |v|
     $options[:query] << v
   end
   
-  opts.on("--rquery QUERY", "Custom query") do |v|
+  opts.on("--rquery QUERY", "Custom query (blacklist)") do |v|
     $options[:rquery] << v
   end
 
-  opts.on("-t", "--table TABLE", "Table to verify") do |v|
+  opts.on("-t", "--table TABLE", "Data table to verify") do |v|
     $options[:table] = v
   end
 
@@ -75,7 +75,7 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:pretty] = v
   end
   
-  opts.on("--case-insensitive", "Use more human-readable error message") do |v|
+  opts.on("--case-insensitive", "As its name implies ^.^") do |v|
     $options[:case_insensitive] = v
   end
 
@@ -119,7 +119,7 @@ Validate `mfrs` table against several rules and write error logs to errors field
               --unique="mfr_number" \\
               --not-null="mfr_number" \\
               --not-null="mfr_lic" \\
-              --match="mfr_number/^2.*" \\
+              --match="mfr_number/^2.*/" \\
               --match="mfr_name/^[a-zA-Z]+/" \\
               --not-match="status/(failed|inactive|wrong)/" \\
               --query="start_date <= end_date"

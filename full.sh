@@ -332,30 +332,30 @@ ivalidate --case-insensitive --pretty -t $ITEM \
 # validate PO
 ivalidate --case-insensitive --pretty -t $PO \
        --log-to=validation_errors \
-       --not-null=po_no \
+       --not-null="po_no" \
        --match="po_no/[a-zA-Z0-9]/" \
-       --not-null=po_date \
-       --not-null=corp_id \
+       --not-null="po_date" \
+       --not-null="corp_id" \
        --match="corp_id/[a-zA-Z0-9]/" \
-       --not-null=corp_name \
+       --not-null="corp_name" \
        --match="corp_name/[a-zA-Z0-9]/" \
-       --not-null=cost_center_id \
+       --not-null="cost_center_id" \
        --match="cost_center_id/[a-zA-Z0-9]/" \
-       --not-null=cost_center_name \
+       --not-null="cost_center_name" \
        --match="cost_center_name/[a-zA-Z0-9]/" \
-       --not-null=po_line_number \
+       --not-null="po_line_number" \
        --match="po_line_number/^[1-9][0-9]*$/" \
-       --not-null=item_id \
+       --not-null="item_id" \
        --match="item_id/[a-zA-Z0-9]/" \
-       --not-null=vendor_name \
+       --not-null="vendor_name" \
        --match="vendor_name/[a-zA-Z0-9]/" \
-       --not-null=vendor_code \
+       --not-null="vendor_code" \
        --match="vendor_code/[a-zA-Z0-9]/" \
-       --not-null=mfr_name \
+       --not-null="mfr_name" \
        --match="mfr_name/[a-zA-Z0-9]/" \
-       --not-null=mfr_number \
+       --not-null="mfr_number" \
        --match="mfr_number/[a-zA-Z0-9]/" \
-       --not-null=item_descr \
+       --not-null="item_descr" \
        --consistent-by="corp_id|corp_name" \
        --consistent-by="corp_name|corp_id" \
        --consistent-by="vendor_code|vendor_name" \
@@ -379,6 +379,8 @@ ivalidate --case-insensitive --pretty -t $PO \
 # do not check --match="item_descr/[a-zA-Z0-9]/" \
 
 # validate Req
+#       --consistent-by="corp_id|corp_name" \
+#       --consistent-by="corp_name|corp_id" \
 ivalidate --case-insensitive --pretty -t $REQ \
        --log-to=validation_errors \
        --not-null="req_no" \
@@ -389,6 +391,8 @@ ivalidate --case-insensitive --pretty -t $REQ \
        --match="corp_id/[a-zA-Z0-9]/" \
        --not-null="corp_name" \
        --match="corp_name/[a-zA-Z0-9]/" \
+       --not-null="costcenter_id" \
+       --match="costcenter_id/[a-zA-Z0-9]/" \
        --not-null="req_line_number" \
        --match="req_line_number/^[1-9][0-9]*$/" \
        --not-null="item_id" \
@@ -397,8 +401,6 @@ ivalidate --case-insensitive --pretty -t $REQ \
        --match="vendor_name/[a-zA-Z0-9]/" \
        --not-null="vendor_code" \
        --match="vendor_code/[a-zA-Z0-9]/" \
-       --consistent-by="corp_id|corp_name" \
-       --consistent-by="corp_name|corp_id" \
        --rquery="(item_id not like '%~%' and item_id not in (select item_id from items)) -- item_id does not reference items.item_id" \
        --cross-reference="corp_id|$GL.corp_acct_no" \
        --cross-reference="corp_name|$GL.corp_acct_name" \
