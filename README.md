@@ -1,5 +1,5 @@
 # Overview
-We provide some useful utilities for validating data in a PostgreSQL data table
+We provide some utilities for validating data in a PostgreSQL data table
 These utilities can be used as simple terminal commands and can be installed by:
 
     gem install idata
@@ -37,7 +37,7 @@ Then the validation command could be:
                 --not-null="vendor_name" \
                 --unique="vendor_id,vendor_name" \
                 --consistent-by="vendor_id|vendor_name" \
-                --consistent-by="vendor_id|vendor_name" \
+                --consistent-by="vendor_name|vendor_id" \
                 --cross-reference="vendor_code|vendors.code"
 ```
 Validation results for every single record are logged to an additional column named `validation_errors`
