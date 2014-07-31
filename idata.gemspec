@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.version       = Idata::VERSION
   spec.authors       = ["Nghi Pham"]
   spec.email         = ["minhnghivn@gmail.com"]
-  spec.description   = %q{Tools for importing data from raw files}
-  spec.summary       = %q{Tools include: iload, ivalidate, isanitize, ipatch, ieval, iexport}
+  spec.description   = %q{Included: iload, ivalidate, isanitize, ipatch, ieval, iexpor}
+  spec.summary       = %q{Data validation utilities}
   spec.homepage      = "https://github.com/minhnghivn/idata"
   spec.license       = "MIT"
 
