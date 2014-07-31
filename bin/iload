@@ -176,14 +176,20 @@ ActiveRecord::Base.establish_connection(
 $csv_converters = [:stripper]
 
 CSV::Converters[:stripper] = lambda{ |s|
-  return s.strip if s.is_a?(String)
+  if s.is_a?(String)
+    r = s.strip
+    return nil if r == ""
+    return r
+  else
+    return s
+  end
 }
 
 $csv_converters << :null_converter if $options[:null]
 
 CSV::Converters[:null_converter] = lambda{ |s|
-  return nil if s == $options[:null] or s == "" or s.nil?
-  return s.strip
+  return nil if s == $options[:null]
+  return s
 }
 
 class String

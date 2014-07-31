@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["minhnghivn@gmail.com"]
   spec.description   = %q{Tools for importing data from raw files}
   spec.summary       = %q{Tools include: iload, ivalidate, isanitize, ipatch, ieval, iexport}
-  spec.homepage      = "http://bolero.vn"
+  spec.homepage      = "https://github.com/minhnghivn/idata"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files`.split($/)
