@@ -16,8 +16,8 @@
 # you can set the corresponding environment variables which can be used by the those commands
 export HOST="localhost"
 export USERNAME="postgres"
-export PASSWORD="postgres"
-export DATABASE="northeast_georgia"
+export PASSWORD="t0p!Secret"
+export DATABASE="sampledb"
 export LISTEN=5432
 
 # Input file paths and corresponding table names
