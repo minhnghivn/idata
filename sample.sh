@@ -104,7 +104,7 @@ ivalidate --table=$ITEM \
 # Just to make a MORE comprehensive report, we can:
 #    1 Create a summary table which tells us how many errors found, how many records associated with each...
 #    2 Extract the first 1000 sample records for every error
-#    3 Put all together into one single Excel report
+#    3 Put them all together into one single Excel report
 
 # 1) Create error summary report table and write to /tmp/summary.csv
 # This can be done using the iexport utility which can generate a CSV file from a data table or from a custom query
@@ -113,8 +113,8 @@ iexport --output="$TMP/summary.csv" -f csv --no-quote-empty --quotes --headers \
         --query="(select '$FVENDOR' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $VENDOR), 2)::varchar || '%' as percentage from $VENDOR group by error order by error) union
                  (select '$FITEM' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $ITEM), 2)::varchar || '%' as percentage from $ITEM group by error order by error)"
 
-# Export the first 1000 records of every error in the items table
-# Write the results to /tmp/items.csv
+# Export the first 1000 sample records of every error in the vendors table
+# Write the results to /tmp/vendors.csv
 iexport --table=$VENDOR --output="$TMP/$VENDOR.csv" -f csv --no-quote-empty --quotes --headers \
         --query="select * from (select ROW_NUMBER() OVER (PARTITION BY error) AS group_index, * 
                  FROM ( select unnest(string_to_array(validation_errors, ' || ')) as error, * from
@@ -122,8 +122,8 @@ iexport --table=$VENDOR --output="$TMP/$VENDOR.csv" -f csv --no-quote-empty --qu
                  where group_index <= 1000" \
         --exclude="id, validation_errors, group_index"
 
-# 2) Export the first 1000 records of every error in the vendors table
-# Write the results to /tmp/vendors.csv
+# 2) Export the first 1000 sample records for every error in the items table
+# Write the results to /tmp/items.csv
 iexport --table=$ITEM --output="$TMP/$ITEM.csv" -f csv --no-quote-empty --quotes --headers \
         --query="select * from (select ROW_NUMBER() OVER (PARTITION BY error) AS group_index, * 
                  FROM ( select unnest(string_to_array(validation_errors, ' || ')) as error, * from
