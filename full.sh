@@ -227,7 +227,6 @@ ivalidate --case-insensitive --pretty -t $LOCATION \
        --rquery="(loc_type ~* '^(LOC_TYPE_SUPPLY|S)$' and (corp_acct_no is null or corp_name is null or corp_id is null)) -- either corp id/name or corp_acct_no is null" \
        --not-null="active" \
        --match="active/^(Y|N|1|2|3)$/" \
-       --not-null="corp_acct_no" \
        --match="corp_acct_no/[a-zA-Z0-9]/" \
        --rquery="((inventory_path_name != '' AND inventory_path_name IS NOT NULL AND lower(inventory_path_name) != 'default') AND (inventory_loc_seq_no IS NULL OR inventory_loc_seq_no = '')) -- [inventory_loc_seq_no] is null" \
        --rquery="((inventory_path_name != '' AND inventory_path_name IS NOT NULL AND lower(inventory_path_name) != 'default') AND (inventory_location_name IS NULL OR inventory_location_name = '')) -- [inventory_location_name] is null" \
@@ -245,6 +244,7 @@ ivalidate --case-insensitive --pretty -t $LOCATION \
 
 
 # validate CONTRACTS ORIGINAL
+# @note Check unique keyset with item_id included for MSCM only
 ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --log-to=validation_errors \
        --not-null=contract_number \
@@ -283,7 +283,7 @@ ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --match="contract_price/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/" \
        --match="item_qoe/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/" \
        --rquery="(item_uom NOT IN (SELECT code FROM uomstd) AND item_uom !~ '^[a-zA-Z0-9]{1,3}$') -- invalid item_uom" \
-       --unique="contract_gpo_name, contract_number, contract_start, contract_end, vendor_name, mfr_item_id, mfr_name, item_uom, corp_id" \
+       --unique="contract_gpo_name, contract_number, contract_start, contract_end, vendor_name, mfr_item_id, mfr_name, item_uom, corp_id, item_id" \
 
 # validate ITEM
 # Accepted:
@@ -372,7 +372,7 @@ ivalidate --case-insensitive --pretty -t $PO \
        --cross-reference="cost_center_id|$GL.cc_acct_no" \
        --cross-reference="cost_center_name|$GL.cc_acct_name" \
        --rquery="(purchase_uom NOT IN (SELECT code FROM uomstd) AND purchase_uom !~ '^[a-zA-Z0-9]{1,3}$') -- invalid [purchase_uom]" \
-       --rquery="(item_id IS NOT NULL AND (vendor_code IS NOT NULL OR vendor_name IS NOT NULL) AND vendor_item_id IS NULL) -- [vendor_item_id] is null" \
+       --rquery="((item_id IS NULL OR item_id !~ '[a-zA-Z0-9]') AND (vendor_item_id IS NULL OR vendor_item_id !~ '[a-zA-Z0-9]')) -- [vendor_item_id] is either null or invalid" \
        --match="purchase_price/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/" \
        --match="purchase_qoe/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/"
        
