@@ -32,7 +32,8 @@ and vice-versa
 
 Then the validation command could be:
 ```
-      ivalidate --host=localhost --user=postgres --database=mydb --table=items --log-to=validation_errors \
+      ivalidate --host=localhost --user=postgres --database=mydb --table=items
+                --log-to=validation_errors \
                 --not-null="vendor_code" \
                 --not-null="vendor_name" \
                 --unique="vendor_code,vendor_name" \
