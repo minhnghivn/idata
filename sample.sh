@@ -39,6 +39,7 @@ REPORT="/tmp/report.xls"
 # Load data from VendorMaster.csv to the corresponding vendors table
 # and from ItemMaster.csv to items table.
 # Note: instead of using iload utility,you can use the PSQL COPY of PostgreSQL
+#       in such case, make sure an AUTO ID (unique) field is added to every table
 iload -i "$FVENDOR" -t "$VENDOR" -f csv
 iload -i "$FITEM" -t "$ITEM" -f csv
 
