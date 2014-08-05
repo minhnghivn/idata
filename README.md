@@ -13,7 +13,7 @@ idata comes along with the following commands:
 * imerge
 * isanitize
 
-Run a command with --help switch for the details
+Run a command with `--help` switch for the details
 
 Prequisites:
 * PostgreSQL 9.0 or above
@@ -67,15 +67,13 @@ then `--query` switch may be helpful. For example:
     ivalidate --query="string_to_date(start_date) >= '01/02/2014' -- invalid date"
 ``` 
 You can also use `--rquery` which is the reversed counterpart of `--query`
-For example, the following two checks are equivalent:
+For example, the following two checks are equivalent, mark any record whose `start_date < '01/02/2014'` as "invalid date":
 ```
-    ivalidate --query="string_to_date(start_date) >= '01/02/2014' -- invalid date"
-    ivalidate --rquery="string_to_date(start_date) < '01/02/2014' -- invalid date"
+    ivalidate --query="start_date >= string_to_date('01/02/2014') -- invalid date"
+    ivalidate --rquery="start_date < string_to_date('01/02/2014') -- invalid date"
 ``` 
-(mark any record whose `start_date < '01/02/2014'` as "invalid date")
 
 Note: run `ivalidate --help` to see the full list of supported switches
-
 
 # Put it all together
 You can put several `ivalidate` commands (for several data tables) in one single bash/sh file.
@@ -84,6 +82,6 @@ Besides `ivalidate`, we also support some other utilities to:
 + Modify data tables
 + Generate summary reports
 
-For a full example, see our `sample.sh`
+See our `sample.sh` for a comprehensive example
 
 
