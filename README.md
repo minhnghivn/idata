@@ -50,7 +50,7 @@ of the `items` table, as specified by the `--log-to` switch. As you can see, mos
     --cross-reference
 ```
 # Custom Validation
-For more generic check, we support some other switches.
+For more customized checks, we support some other switches.
 
 The `--match="field/pattern/"` switch tells the program to check if value of a `field` matches the provided `pattern` (which is a regular expression).
 For example:
