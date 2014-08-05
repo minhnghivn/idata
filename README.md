@@ -1,5 +1,5 @@
 # Overview
-We provide some utilities for validating data in a PostgreSQL data table
+We provide some utilities for validating data in a PostgreSQL data table.
 These utilities can be used as simple terminal commands and can be installed by:
 
     gem install idata
