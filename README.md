@@ -23,34 +23,33 @@ Prequisites:
 # Usage
 Suppose we have an `items` table, and we want to validate its records against certain criteria like:
 
-* `item_id` must not be null
-* `item_title` must not be null
-* The composite `[item_id, item_title]` must be unique
-* One `item_id` corresponds to only ONE `item_title` (in other words, there must not be two items with different titles but with the same `item_id`)
+* `vendor_code` must not be null
+* `vendor_name` must not be null
+* The composite `[vendor_code, vendor_name]` must be unique
+* One `vendor_code` corresponds to only ONE `vendor_name` (in other words, there must not be two items with different `vendor_name` but with the same `item_code`)
 and vice-versa
 * `vendor_code` must reference the `code` column in the `vendors` table
 
 Then the validation command could be:
 ```
       ivalidate --host=localhost --user=postgres --database=mydb --table=items --log-to=validation_errors \
-                --not-null="vendor_id" \
+                --not-null="vendor_code" \
                 --not-null="vendor_name" \
-                --unique="vendor_id,vendor_name" \
-                --consistent-by="vendor_id|vendor_name" \
-                --consistent-by="vendor_name|vendor_id" \
+                --unique="vendor_code,vendor_name" \
+                --consistent-by="vendor_code|vendor_name" \
+                --consistent-by="vendor_name|vendor_code" \
                 --cross-reference="vendor_code|vendors.code"
 ```
 Validation results for every single record are logged to an additional column named `validation_errors`
-of the `items` table, as specified by the `--log-to` switch
-
-As you can see, most common checks can be performed using the supported switches:
+of the `items` table, as specified by the `--log-to` switch. As you can see, most common checks can be performed using the supported switches:
 ```
     --not-null
     --unique
     --consistent-by
     --cross-reference
 ```
-For more generic check, we support some other switches:
+# Custom Validation
+For more generic check, we support some other switches.
 
 The `--match="field/pattern/"` switch tells the program to check if value of a `field` matches the provided `pattern` (which is a regular expression).
 For example:
