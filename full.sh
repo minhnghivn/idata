@@ -586,6 +586,7 @@ imerge --output=$OUTPUT_DIR/$ORGNAME.xls \
         --input="ContractMaster:$OUTPUT_DIR/$CONTRACTO.csv" \
         --input="ItemMaster:$OUTPUT_DIR/$ITEM.csv" \
         --input="MfrMaster:$OUTPUT_DIR/$MFR.csv" \
+        --input="VendorMaster:$OUTPUT_DIR/$VENDOR.csv" \
         --input="PurchaseOrder:$OUTPUT_DIR/$PO.csv" \
         --input="User:$OUTPUT_DIR/$USER.csv" \
         --input="Location:$OUTPUT_DIR/$LOCATION.csv" \
