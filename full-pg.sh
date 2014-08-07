@@ -22,7 +22,6 @@ FITEM="ItemMaster.csv"
 FINVOICE="InvoiceHistory.csv"
 FMFR="MfrMaster.csv"
 FPO="20140708_150920_s2_PoHistory_Report2_NEGA_modified.csv"
-FPO2="PurchaseOrder.csv"
 FUSER="User.csv"
 FLOCATION="Location.csv"
 FITEMCOST="ItemCostCenterAcctExceptions.csv"
@@ -38,7 +37,6 @@ ITEM="items"
 INVOICE="invoices"
 MFR="manufacturers"
 PO="purchase_orders"
-PO2="second_purchase_orders"
 USER="users"
 LOCATION="locations"
 ITEMCOST="item_costs"
@@ -67,7 +65,6 @@ iload -i "$FITEM" -t "$ITEM" -f csv
 #iload -i "$FINVOICE" -t "$INVOICE" -f csv
 iload -i "$FMFR" -t "$MFR" -f csv
 iload -i "$FPO" -t "$PO" -f csv
-iload -i "$FPO2" -t "$PO2" -f csv
 iload -i "$FUSER" -t "$USER" -f csv
 iload -i "$FLOCATION" -t "$LOCATION" -f csv
 #iload -i "$FITEMCOST" -t "$ITEMCOST" -f csv
@@ -163,7 +160,7 @@ ivalidate --case-insensitive --pretty -t $VENDOR \
        --log-to=validation_errors \
        --not-null="vendor_code" \
        --not-null="vendor_name" \
-       --unique="vendor_code,vendor_name" \
+       --unique="vendor_code, vendor_name" \
        --match="vendor_code/[a-zA-Z0-9]/" \
        --match="vendor_name/[a-zA-Z0-9]/" \
        --consistent-by="vendor_code|vendor_name" \
@@ -176,9 +173,11 @@ ivalidate --case-insensitive --pretty -t $MFR \
        --log-to=validation_errors \
        --not-null="mfr_number" \
        --not-null="mfr_name" \
+       --unique="mfr_number, mfr_name" \
        --match="mfr_number/[a-zA-Z0-9]/" \
        --match="mfr_name/[a-zA-Z0-9]/" \
        --consistent-by="mfr_name|mfr_number" \
+       --consistent-by="mfr_number|mfr_name" \
        --consistent-by="country_code|country_name" \
        --consistent-by="country_name|country_code"
 
@@ -205,15 +204,15 @@ ivalidate --case-insensitive --pretty -t $GL \
        --consistent-by="corp_acct_name|corp_acct_no" \
        --consistent-by="exp_acct_no|corp_acct_no, corp_acct_name, cc_acct_no, cc_acct_name, exp_acct_name" \
        --consistent-by="exp_acct_name|corp_acct_no, corp_acct_name, cc_acct_no, cc_acct_name, exp_acct_no" \
-       --consistent-by="cc_acct_no|corp_acct_no, corp_acct_name, cc_acct_name" \
-       --consistent-by="cc_acct_name|corp_acct_no, corp_acct_name, cc_acct_no" \
+       --consistent-by="cc_acct_no|corp_acct_no, corp_acct_name, cc_acct_name, exp_acct_no, exp_acct_name" \
+       --consistent-by="cc_acct_name|corp_acct_no, corp_acct_name, cc_acct_no, exp_acct_no, exp_acct_name" \
        --not-null=exp_acct_type \
        --match="exp_acct_type/^(1|2|3|4|5|Asset|Liability|Equity|Income\sStatement|Expense|Income)$/"
        
 # validate LOCATION
 ivalidate --case-insensitive --pretty -t $LOCATION \
        --log-to=validation_errors \
-       --not-null=loc_id \
+       --not-null="loc_id" \
        --match="loc_id/[a-zA-Z0-9]/" \
        --not-null="name" \
        --match="name/[a-zA-Z0-9]/" \
@@ -221,22 +220,18 @@ ivalidate --case-insensitive --pretty -t $LOCATION \
        --match="facility_code/[a-zA-Z0-9]/" \
        --not-null=facility_desc \
        --match="facility_desc/[a-zA-Z0-9]/" \
-       --match="ship_to_ind/^(Y|N)$/" \
-       --match="bill_to_ind/^(Y|N)$/" \
-       --match="stockless_ind/^(Y|N)$/" \
-       --not-null=loc_type \
+       --match="ship_to_ind/^(Y|N|y|n)$/" \
+       --match="bill_to_ind/^(Y|N|y|n)$/" \
+       --match="stockless_ind/^(Y|N|y|n)$/" \
+       --not-null="loc_type" \
        --match="loc_type/^(C|S|LOC_TYPE_SUPPLY|LOC_TYPE_CONSUME)$/" \
-       --not-null=inventory_path_name \
-       --not-null=inventory_location_name \
-       --query="(route_no is null or route_no = '' or regexp_replace(route_no, '[,\.]', '', 'g') ~ '^[1-9][0-9]+$') -- invalid route_no" \
        --rquery="(loc_type ~* '^(LOC_TYPE_SUPPLY|S)$' and (corp_acct_no is null or corp_name is null or corp_id is null)) -- either corp id/name or corp_acct_no is null" \
-       --not-null=active \
-       --match="active/^(Y|N)$/" \
-       --not-null=corp_acct_no \
+       --not-null="active" \
+       --match="active/^(Y|N|1|2|3)$/" \
        --match="corp_acct_no/[a-zA-Z0-9]/" \
-       --not-null=inventory_loc_seq_no \
-       --match="inventory_loc_seq_no/^[1-9][0-9]*$/" \
-       --match="route_no/^[1-9][0-9]*$/" \
+       --rquery="((inventory_path_name != '' AND inventory_path_name IS NOT NULL AND lower(inventory_path_name) != 'default') AND (inventory_loc_seq_no IS NULL OR inventory_loc_seq_no = '')) -- [inventory_loc_seq_no] is null" \
+       --rquery="((inventory_path_name != '' AND inventory_path_name IS NOT NULL AND lower(inventory_path_name) != 'default') AND (inventory_location_name IS NULL OR inventory_location_name = '')) -- [inventory_location_name] is null" \
+       --match="route_no/[a-zA-Z0-9]/" \
        --match="route_name/[a-zA-Z0-9]/" \
        --match="corp_name/[a-zA-Z0-9]/" \
        --consistent-by="corp_name|corp_id" \
@@ -250,6 +245,7 @@ ivalidate --case-insensitive --pretty -t $LOCATION \
 
 
 # validate CONTRACTS ORIGINAL
+# @note Check unique keyset with item_id included for MSCM only
 ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --log-to=validation_errors \
        --not-null=contract_number \
@@ -259,16 +255,21 @@ ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --not-null=mfr_item_id \
        --not-null=mfr_name \
        --not-null=item_uom \
+       --not-null=corp_id \
+       --not-null=item_descr \
        --not-null=item_qoe \
        --not-null=contract_price \
        --not-null=contract_gpo_name \
+       --not-null=contract_gpo_id \
        --match="contract_number/[a-zA-Z0-9]/" \
+       --match="contract_gpo_name/[a-zA-Z0-9]/" \
+       --match="corp_id/[a-zA-Z0-9]/" \
        --match="corp_name/[a-zA-Z0-9]/" \
        --match="vendor_item_id/[a-zA-Z0-9]/" \
        --match="vendor_name/[a-zA-Z0-9]/" \
        --match="mfr_item_id/[a-zA-Z0-9]/" \
        --match="mfr_name/[a-zA-Z0-9]/" \
-       --query="to_date(contract_end, 'YYYY-MM-DD') >= to_date(contract_start, 'YYYY-MM-DD') -- Contract end-date goes before start-date" \
+       --query="to_date(contract_end, 'YYYY-MM-DD') >= to_date(contract_start, 'YYYY-MM-DD') -- [contract_end] comes before [contract_start]" \
        --match="contract_status/^(1|2|3|A|I|Inactive|Active|Y)$/" \
        --match="item_status/^(1|2|3|A|I|Inactive|Active|Y)$/" \
        --consistent-by="corp_id|corp_name" \
@@ -283,7 +284,7 @@ ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --match="contract_price/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/" \
        --match="item_qoe/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/" \
        --rquery="(item_uom NOT IN (SELECT code FROM uomstd) AND item_uom !~ '^[a-zA-Z0-9]{1,3}$') -- invalid item_uom" \
-       --unique="contract_gpo_name, contract_number, contract_start, contract_end, vendor_name, mfr_item_id, mfr_name, item_uom, corp_id" \
+       --unique="contract_gpo_name, contract_number, contract_start, contract_end, vendor_name, mfr_item_id, mfr_name, item_uom, corp_id, item_id" \
 
 # validate ITEM
 # Accepted:
@@ -312,6 +313,7 @@ ivalidate --case-insensitive --pretty -t $ITEM \
        --match="mfr_number/[a-zA-Z0-9]/" \
        --match="mfr_name/[a-zA-Z0-9]/" \
        --match="active/^(1|2|3|A|I)$/" \
+       --unique="item_id, corp_id, vendor_code, item_uom" \
        --cross-reference="vendor_code|$VENDOR.vendor_code" \
        --cross-reference="vendor_name|$VENDOR.vendor_name" \
        --cross-reference="mfr_number|$MFR.mfr_number" \
@@ -331,82 +333,37 @@ ivalidate --case-insensitive --pretty -t $ITEM \
 # validate PO
 ivalidate --case-insensitive --pretty -t $PO \
        --log-to=validation_errors \
-       --not-null=po_no \
+       --not-null="po_no" \
        --match="po_no/[a-zA-Z0-9]/" \
-       --not-null=po_date \
-       --not-null=corp_id \
+       --not-null="po_date" \
+       --not-null="corp_id" \
        --match="corp_id/[a-zA-Z0-9]/" \
-       --not-null=corp_name \
+       --not-null="corp_name" \
        --match="corp_name/[a-zA-Z0-9]/" \
-       --not-null=Paragon_Cost_Center_Acct \
-       --match="Paragon_Cost_Center_Acct/[a-zA-Z0-9]/" \
-       --not-null=cost_center_name \
-       --match="cost_center_name/[a-zA-Z0-9]/" \
-       --not-null=PO_Line_No \
-       --match="PO_Line_No/^[1-9][0-9]*$/" \
-       --not-null=item_id \
-       --match="item_id/[a-zA-Z0-9]/" \
-       --not-null=vendor_name \
-       --match="vendor_name/[a-zA-Z0-9]/" \
-       --not-null=Paragon_Vendor_Code \
-       --match="Paragon_Vendor_Code/[a-zA-Z0-9]/" \
-       --match="mfr_name/[a-zA-Z0-9]/" \
-       --not-null=mfr_number \
-       --match="mfr_number/[a-zA-Z0-9]/" \
-       --not-null=item_descr \
-       --consistent-by="corp_id|corp_name" \
-       --consistent-by="corp_name|corp_id" \
-       --consistent-by="Paragon_Vendor_Code|vendor_name" \
-       --consistent-by="vendor_name|Paragon_Vendor_Code" \
-       --consistent-by="mfr_name|mfr_number" \
-       --unique="po_no, PO_Line_No" \
-       --rquery="(item_id not like '%~%' and item_id not in (select item_id from items)) -- item_id does not reference items.item_id" \
-       --cross-reference="Paragon_Vendor_Code|$VENDOR.vendor_code" \
-       --cross-reference="vendor_name|$VENDOR.vendor_name" \
-       --cross-reference="mfr_number|$MFR.mfr_number" \
-       --cross-reference="mfr_name|$MFR.mfr_name" \
-       --cross-reference="corp_id|$GL.corp_acct_no" \
-       --cross-reference="corp_name|$GL.corp_acct_name" \
-       --cross-reference="Paragon_Cost_Center_Acct|$GL.cc_acct_no" \
-       --cross-reference="cost_center_name|$GL.cc_acct_name" \
-       --rquery="(purchase_uom NOT IN (SELECT code FROM uomstd) AND purchase_uom !~ '^[a-zA-Z0-9]{1,3}$') -- invalid purchase_uom" \
-       --rquery="(item_id IS NOT NULL AND (Paragon_Vendor_Code IS NOT NULL OR vendor_name IS NOT NULL) AND vendor_item_id IS NULL) -- vendor_item_id is null" \
-       --match="purchase_price/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/" \
-       --match="purchase_qoe/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/"
-       
-ivalidate --case-insensitive --pretty -t $PO2 \
-       --log-to=validation_errors \
-       --not-null=po_no \
-       --match="po_no/[a-zA-Z0-9]/" \
-       --not-null=po_date \
-       --not-null=corp_id \
-       --match="corp_id/[a-zA-Z0-9]/" \
-       --not-null=corp_name \
-       --match="corp_name/[a-zA-Z0-9]/" \
-       --not-null=cost_center_id \
+       --not-null="cost_center_id" \
        --match="cost_center_id/[a-zA-Z0-9]/" \
-       --not-null=cost_center_name \
+       --not-null="cost_center_name" \
        --match="cost_center_name/[a-zA-Z0-9]/" \
-       --not-null=PO_Line_Number \
-       --match="PO_Line_Number/^[1-9][0-9]*$/" \
-       --not-null=item_id \
+       --not-null="po_line_number" \
+       --match="po_line_number/^[1-9][0-9]*$/" \
+       --not-null="item_id" \
        --match="item_id/[a-zA-Z0-9]/" \
-       --not-null=vendor_name \
+       --not-null="vendor_name" \
        --match="vendor_name/[a-zA-Z0-9]/" \
-       --not-null=vendor_code \
+       --not-null="vendor_code" \
        --match="vendor_code/[a-zA-Z0-9]/" \
-       --not-null=mfr_name \
+       --not-null="mfr_name" \
        --match="mfr_name/[a-zA-Z0-9]/" \
-       --not-null=mfr_number \
+       --not-null="mfr_number" \
        --match="mfr_number/[a-zA-Z0-9]/" \
-       --not-null=item_descr \
+       --not-null="item_descr" \
        --consistent-by="corp_id|corp_name" \
        --consistent-by="corp_name|corp_id" \
        --consistent-by="vendor_code|vendor_name" \
        --consistent-by="vendor_name|vendor_code" \
        --consistent-by="mfr_name|mfr_number" \
-       --unique="po_no, PO_Line_Number" \
-       --rquery="(item_id not like '%~%' and item_id not in (select item_id from items)) -- item_id does not reference items.item_id" \
+       --unique="po_no, po_line_number" \
+       --rquery="(item_id not like '%~%' and item_id not in (select item_id from items)) -- [item_id] does not reference [items.item_id]" \
        --cross-reference="vendor_code|$VENDOR.vendor_code" \
        --cross-reference="vendor_name|$VENDOR.vendor_name" \
        --cross-reference="mfr_number|$MFR.mfr_number" \
@@ -415,12 +372,16 @@ ivalidate --case-insensitive --pretty -t $PO2 \
        --cross-reference="corp_name|$GL.corp_acct_name" \
        --cross-reference="cost_center_id|$GL.cc_acct_no" \
        --cross-reference="cost_center_name|$GL.cc_acct_name" \
-       --rquery="(purchase_uom NOT IN (SELECT code FROM uomstd) AND purchase_uom !~ '^[a-zA-Z0-9]{1,3}$') -- invalid purchase_uom" \
-       --rquery="(item_id IS NOT NULL AND (vendor_code IS NOT NULL OR vendor_name IS NOT NULL) AND vendor_item_id IS NULL) -- vendor_item_id is null" \
+       --rquery="(purchase_uom NOT IN (SELECT code FROM uomstd) AND purchase_uom !~ '^[a-zA-Z0-9]{1,3}$') -- invalid [purchase_uom]" \
+       --rquery="((item_id IS NULL OR item_id !~ '[a-zA-Z0-9]') AND (vendor_item_id IS NULL OR vendor_item_id !~ '[a-zA-Z0-9]')) -- [vendor_item_id] is either null or invalid" \
        --match="purchase_price/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/" \
        --match="purchase_qoe/^[0-9]+(\.{0,1}[0-9]+|[0-9]*)$/"
 
+# do not check --match="item_descr/[a-zA-Z0-9]/" \
+
 # validate Req
+#       --consistent-by="corp_id|corp_name" \
+#       --consistent-by="corp_name|corp_id" \
 ivalidate --case-insensitive --pretty -t $REQ \
        --log-to=validation_errors \
        --not-null="req_no" \
@@ -431,6 +392,8 @@ ivalidate --case-insensitive --pretty -t $REQ \
        --match="corp_id/[a-zA-Z0-9]/" \
        --not-null="corp_name" \
        --match="corp_name/[a-zA-Z0-9]/" \
+       --not-null="costcenter_id" \
+       --match="costcenter_id/[a-zA-Z0-9]/" \
        --not-null="req_line_number" \
        --match="req_line_number/^[1-9][0-9]*$/" \
        --not-null="item_id" \
@@ -439,13 +402,7 @@ ivalidate --case-insensitive --pretty -t $REQ \
        --match="vendor_name/[a-zA-Z0-9]/" \
        --not-null="vendor_code" \
        --match="vendor_code/[a-zA-Z0-9]/" \
-       --not-null="mfr_name" \
-       --match="mfr_name/[a-zA-Z0-9]/" \
-       --not-null="item_descr" \
-       --match="item_descr/[a-zA-Z0-9]/" \
-       --consistent-by="corp_id|corp_name" \
-       --consistent-by="corp_name|corp_id" \
-       --rquery="(item_id not like '%~[%' and item_id not in (select item_id from items)) -- item_id does not reference items.item_id" \
+       --rquery="(item_id not like '%~%' and item_id not in (select item_id from items)) -- item_id does not reference items.item_id" \
        --cross-reference="corp_id|$GL.corp_acct_no" \
        --cross-reference="corp_name|$GL.corp_acct_name" \
        --cross-reference="vendor_name|$VENDOR.vendor_name" \
@@ -460,20 +417,8 @@ ivalidate --case-insensitive --pretty -t $USER \
        --log-to=validation_errors \
        --not-null="email" \
        --unique="email" \
-       --query="lower(email) ~* '[a-z0-9][a-z0-9_\.]+@[a-z0-9][a-z0-9_\.\-]+\.[a-z0-9_\.\-]+' -- invalid email address"
+       --match="lower(email)/[a-z0-9][a-z0-9_\.]+@[a-z0-9][a-z0-9_\.\-]+\.[a-z0-9_\.\-]+/"
 
-# validate
-#ivalidate --case-insensitive --pretty -t $ITEMCOST \
-#       --log-to=validation_errors \
-#       --not-null="corp_acct_no" \
-#       --match="corp_acct_no/[a-zA-Z0-9]/" \
-#       --not-null="item_no" \
-#       --match="item_no/[a-zA-Z0-9]/" \
-#       --not-null="excp_type" \
-#       --match="excp_type/^(A|R)$/" \
-#       --cross-reference="corp_acct_no|$GL.corp_acct_no" \
-#       --cross-reference="item_no|$ITEM.item_id" \
-#       --cross-reference="exp_acct_no|$GL.exp_acct_no"
 
 # validate INVENTORY
 ivalidate --case-insensitive --pretty -t $INVENTORY \
@@ -484,15 +429,11 @@ ivalidate --case-insensitive --pretty -t $INVENTORY \
        --match="loc_id/[a-zA-Z0-9]/" \
        --not-null="vendor_code" \
        --match="vendor_code/[a-zA-Z0-9]/" \
-       --not-null="vendor_name" \
-       --match="vendor_name/[a-zA-Z0-9]/" \
        --not-null="corp_id" \
-       --match="corp_name/[a-zA-Z0-9]/" \
-       --not-null="location_name" \
+       --match="corp_id/[a-zA-Z0-9]/" \
        --match="location_name/[a-zA-Z0-9]/" \
        --not-null="item_id" \
-       --match="item_id/[a-zA-Z0-9]/" \
-       --match="inventory_status/^(Active|Pending Inactive|Inactive)$/" \
+       --match="inventory_status/^(Active|Pending Inactive|Inactive|1|2|3)$/" \
        --cross-reference="item_id|$ITEM.item_id" \
        --cross-reference="location_name|$LOCATION.name" \
        --cross-reference="vendor_code|$VENDOR.vendor_code" \
@@ -577,14 +518,6 @@ iexport -t $PO \
                  where group_index <= 1000" \
         --exclude="id, validation_errors, group_index"
 
-iexport -t $PO2 \
-        -o "$OUTPUT_DIR/$PO2.csv" -f csv --no-quote-empty --quotes --headers \
-        --query="select * from (select ROW_NUMBER() OVER (PARTITION BY error) AS group_index, * 
-                 FROM ( select unnest(string_to_array(validation_errors, ' || ')) as error, * from
-                 $PO2 order by id  ) as main) as tmp
-                 where group_index <= 1000" \
-        --exclude="id, validation_errors, group_index"
-
 iexport -t $INVENTORY \
         -o "$OUTPUT_DIR/$INVENTORY.csv" -f csv --no-quote-empty --quotes --headers \
         --query="select * from (select ROW_NUMBER() OVER (PARTITION BY error) AS group_index, * 
@@ -651,7 +584,6 @@ iexport --output="$OUTPUT_DIR/summary.csv" -f csv --no-quote-empty --quotes --he
                  (select 'ReqHistoryLoad' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $REQ), 2)::varchar || '%' as percentage from $REQ group by error order by error) union
                  (select 'MfrMaster' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $MFR), 2)::varchar || '%' as percentage from $MFR group by error order by error) union
                  (select 'PurchaseOrder' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $PO), 2)::varchar || '%' as percentage from $PO group by error order by error) union
-                 (select 'PurchaseOrder2' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $PO2), 2)::varchar || '%' as percentage from $PO2 group by error order by error) union
                  (select 'Inventory' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $INVENTORY), 2)::varchar || '%' as percentage from $INVENTORY group by error order by error) union
                  (select 'User' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $USER), 2)::varchar || '%' as percentage from $USER group by error order by error) union
                  (select 'Location' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $LOCATION), 2)::varchar || '%' as percentage from $LOCATION group by error order by error) union
@@ -667,8 +599,8 @@ imerge --output=$OUTPUT_DIR/$ORGNAME.xls \
         --input="ContractMaster:$OUTPUT_DIR/$CONTRACTO.csv" \
         --input="ItemMaster:$OUTPUT_DIR/$ITEM.csv" \
         --input="MfrMaster:$OUTPUT_DIR/$MFR.csv" \
+        --input="VendorMaster:$OUTPUT_DIR/$VENDOR.csv" \
         --input="PurchaseOrder:$OUTPUT_DIR/$PO.csv" \
-        --input="PurchaseOrder2:$OUTPUT_DIR/$PO2.csv" \
         --input="User:$OUTPUT_DIR/$USER.csv" \
         --input="Location:$OUTPUT_DIR/$LOCATION.csv" \
         --input="ReqHistoryLoad:$OUTPUT_DIR/$REQ.csv" \
