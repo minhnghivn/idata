@@ -3,7 +3,7 @@
 # SHARED VARIABLES
 # ---------------------------------------------------------------------------------
 # Database to store data tables
-ORGNAME="ne20140729"
+ORGNAME="tiff20140805"
 
 # ENV variables used by the validation command
 export HOST="localhost"
@@ -16,12 +16,12 @@ export LISTEN=7432
 OUTPUT_DIR="/tmp/$ORGNAME" && test -e $OUTPUT_DIR || mkdir $OUTPUT_DIR
 
 # Input files and correspondings names
-FCONTRACTO="Contract.csv"
-FVENDOR="VendorMasterUpdate.csv"
+FCONTRACTO="ContractMaster.csv"
+FVENDOR="VendorMaster.csv"
 FITEM="ItemMaster.csv"
 FINVOICE="InvoiceHistory.csv"
 FMFR="MfrMaster.csv"
-FPO="20140708_150920_s2_PoHistory_Report2_NEGA_modified.csv"
+FPO="PurchaseOrder.csv"
 FUSER="User.csv"
 FLOCATION="Location.csv"
 FITEMCOST="ItemCostCenterAcctExceptions.csv"
@@ -67,7 +67,6 @@ iload -i "$FMFR" -t "$MFR" -f csv
 iload -i "$FPO" -t "$PO" -f csv
 iload -i "$FUSER" -t "$USER" -f csv
 iload -i "$FLOCATION" -t "$LOCATION" -f csv
-#iload -i "$FITEMCOST" -t "$ITEMCOST" -f csv
 iload -i "$FREQ" -t "$REQ" -f csv
 iload -i "$FGL" -t "$GL" -f csv
 iload -i "$FINVENTORY" -t "$INVENTORY" -f csv
@@ -98,21 +97,9 @@ UPDATE items set active = '3' where active = 'N';
 "
 
 ipatch -q "
--- Extract FIRST_NAME, LAST_NAME from NAME
---ALTER TABLE $USER ADD COLUMN first_name varchar;
---ALTER TABLE $USER ADD COLUMN last_name varchar;
---UPDATE $USER SET username = trim(regexp_replace(username, '\s+', ' ', 'g'));
---UPDATE $USER SET first_name = username, last_name = username
---WHERE array_length(string_to_array(username, ' '), 1) = 1;
---UPDATE $USER SET first_name = substring(username, '^[^\s]+'),
---                 last_name  = regexp_replace(username, '^[^\s]+\s', '', 'g')
---WHERE array_length(string_to_array(username, ' '), 1) >= 2;
-"
-
-ipatch -q "
 -- ADD EMAIL COLUMN
---ALTER TABLE $USER ADD COLUMN email VARCHAR;
---UPDATE $USER SET email = userlogin;
+ALTER TABLE $USER ADD COLUMN email VARCHAR;
+UPDATE $USER SET email = LOGIN_ID;
 "
 
 ipatch -q "
@@ -456,7 +443,7 @@ ivalidate --case-insensitive --pretty -t $LPR \
        --not-null="Default_Inventory_Location_Name" \
        --cross-reference="Default_Inventory_Location_Name|$LOCATION.Inventory_Location_Name" \
        --match="loc_type/^(C|LOC_TYPE_CONSUME)$/" \
-       --match="active/^(1|2|3|A|I)$/" \
+       --match="active/^(1|2|3|A|I|Y|N)$/" \
        --cross-reference="item_id|$ITEM.item_id" \
        --cross-reference="corp_acct_no|$GL.corp_acct_no" \
        --cross-reference="corp_name|$GL.corp_acct_name" \
@@ -469,14 +456,6 @@ ivalidate --case-insensitive --pretty -t $LPR \
 # Create report file for every table (extract 1000 records for every error)
 # These file will then be used for the Validation Report
 ####################################################
-
-#iexport -t $ITEMCOST \
-#        -o "$OUTPUT_DIR/$ITEMCOST.csv" -f csv --no-quote-empty --quotes --headers \
-#        --query="select * from (select ROW_NUMBER() OVER (PARTITION BY error) AS group_index, * 
-#                 FROM ( select unnest(string_to_array(validation_errors, ' || ')) as error, * from
-#                 $ITEMCOST order by id  ) as main) as tmp
-#                 where group_index <= 1000" \
-#        --exclude="id, validation_errors, group_index"
         
 iexport -t $CONTRACTO \
         -o "$OUTPUT_DIR/$CONTRACTO.csv" -f csv --no-quote-empty --quotes --headers \
@@ -587,7 +566,6 @@ iexport --output="$OUTPUT_DIR/summary.csv" -f csv --no-quote-empty --quotes --he
                  (select 'Inventory' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $INVENTORY), 2)::varchar || '%' as percentage from $INVENTORY group by error order by error) union
                  (select 'User' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $USER), 2)::varchar || '%' as percentage from $USER group by error order by error) union
                  (select 'Location' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $LOCATION), 2)::varchar || '%' as percentage from $LOCATION group by error order by error) union
-                 --(select 'ItemCost' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $ITEMCOST), 2)::varchar || '%' as percentage from $ITEMCOST group by error order by error) union
                  (select 'GLAccount' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $GL), 2)::varchar || '%' as percentage from $GL group by error order by error) union
                  (select 'UserLocationProfile' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $ULPR), 2)::varchar || '%' as percentage from $ULPR group by error order by error) union
                  (select 'LocationProfile' as input_file, unnest(string_to_array(validation_errors, ' || ')) as error, count(*), round((count(*) * 100)::numeric / (select count(*) from $LPR), 2)::varchar || '%' as percentage from $LPR group by error order by error)"
