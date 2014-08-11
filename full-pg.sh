@@ -133,9 +133,15 @@ UPDATE $LOCATION SET stockless_ind = 'N' WHERE stockless_ind IS NULL OR LENGTH(t
 # Convert A2A2A2 to A2-A2-A2
 # Manual check and comment out the following to speed up validating
 # @todo IEVAL performance is very poor, avoid using it (use IPATCH instead) unless there is no better way
+ipatch -q "
+  alter table $GL add column old_fq_acct_no varchar;
+  update $GL set old_fq_acct_no = fq_acct_no;
+"
+
 ieval -t $GL --eval="
   if item.corp_acct_fmt && item.corp_acct_fmt[/^[A-Z][0-9][A-Z][0-9][A-Z][0-9]$/]
     item.corp_acct_fmt = item.corp_acct_fmt.unpack('a2a2a2').join('-')
+    item.fq_acct_no = item.fq_acct_no.unpack('a2a5a5').join('-')
   end
 "
 
@@ -430,7 +436,7 @@ ivalidate --case-insensitive --pretty -t $INVENTORY \
 
 ivalidate --case-insensitive --pretty -t $ULPR \
        --log-to=validation_errors \
-       --match="Default_Indicator/^(Y|N|y|n)$/" \
+       --match="Default_Indicator/^(Y|N|y|n|Y|N)$/" \
        --not-null="email" \
        --cross-reference="email|$USER.email" \
        --cross-reference="loc_id|$LOCATION.loc_id" \
@@ -587,4 +593,82 @@ imerge --output=$OUTPUT_DIR/$ORGNAME.xls \
         --input="$ULPR:$OUTPUT_DIR/$ULPR.csv" \
         --input="$LPR:$OUTPUT_DIR/$LPR.csv"
 
-exit
+####################################################
+# EXPORT FOR UPLOADING
+####################################################
+
+ipatch -q "
+  DELETE FROM purchase_orders where validation_errors ilike '%[po_no, po_line_number] is not unique%';
+  DELETE FROM purchase_orders where validation_errors ilike '%[item_id] does not reference [items.item_id]%';
+
+  DELETE FROM users where validation_errors ilike '%email is null%';
+  DELETE FROM user_location_profiles where validation_errors ilike '%email is null%';
+"
+
+
+
+iexport -t $ITEMCOST \
+        -o "$OUTPUT_DIR/$ITEMCOST.csv" -f csv --no-quote-empty --no-quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+        
+iexport -t $CONTRACTO \
+        -o "$OUTPUT_DIR/$CONTRACTO.csv" -f csv --no-quote-empty --no-quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $VENDOR \
+        -o "$OUTPUT_DIR/$VENDOR.csv" -f csv --no-quote-empty --quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $MFR \
+        -o "$OUTPUT_DIR/$MFR.csv" -f csv --no-quote-empty --quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $GL \
+        -o "$OUTPUT_DIR/$GL.csv" -f csv --no-quote-empty --quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $PO \
+        -o "$OUTPUT_DIR/$PO.csv" -f csv --no-quote-empty --no-quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $INVENTORY \
+        -o "$OUTPUT_DIR/$INVENTORY.csv" -f csv --no-quote-empty --quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $REQ \
+        -o "$OUTPUT_DIR/$REQ.csv" -f csv --no-quote-empty --quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $ITEM \
+        -o "$OUTPUT_DIR/$ITEM.csv" -f csv --no-quote-empty --no-quotes --headers --delim=$'\t' \
+        --query="select item_id, item_descr,vendor_name,vendor_code,vendor_item_id,mfr_name,mfr_number,mfr_item_id,corp_id,corp_name, active, array_to_string(array_agg(item_uom), ',') item_uom, array_to_string(array_agg(item_qoe),',') item_qoe,array_to_string(array_agg(item_price),',') item_price
+          from 
+          (
+           select * from items order by item_id, item_descr,vendor_name,vendor_code,vendor_item_id,mfr_name,mfr_number,mfr_item_id,corp_id,corp_name, active, item_qoe::float desc
+          ) abc
+          group by item_id, item_descr,vendor_name,vendor_code,vendor_item_id,mfr_name,mfr_number,mfr_item_id,corp_id,corp_name, active
+          " \
+        --exclude="id, validation_errors, group_index"
+
+
+ipatch -q "
+  update users set phone = regexp_replace(phone, '[^0123456789]', '', 'g');
+  update users set phone = '1234567890' where phone is null or length(phone) < 10;
+  update users set first_name = username where length(first_name) < 2;
+  update users set last_name = username where length(last_name) < 2;
+"
+iexport -t $USER \
+        -o "$OUTPUT_DIR/$USER.csv" -f csv --no-quote-empty --no-quotes --no-headers --delim=',' \
+        --query="select first_name, last_name, phone, 0 as tmp1, -1 as tmp2, -1 as tmp3, -1 as tmp4, -1 as tmp5, email, '12345678' as passwd, 'Analyst' as tmp6 from users WHERE email IS NOT NULL AND length(email) > 0"
+
+iexport -t $LOCATION \
+        -o "$OUTPUT_DIR/$LOCATION.csv" -f csv --no-quote-empty --quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $LPR \
+        -o "$OUTPUT_DIR/$LPR.csv" -f csv --no-quote-empty --quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
+
+iexport -t $ULPR \
+        -o "$OUTPUT_DIR/$ULPR.csv" -f csv --no-quote-empty --quotes --headers --delim=$'\t' \
+        --exclude="id, validation_errors"
