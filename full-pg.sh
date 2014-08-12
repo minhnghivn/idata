@@ -231,7 +231,6 @@ ivalidate --case-insensitive --pretty -t $LOCATION \
        --consistent-by="corp_id|corp_name" \
        --consistent-by="name|facility_code, loc_id" \
        --consistent-by="loc_id|facility_code, name" \
-       --cross-reference="inventory_path_name|$LOCATION.name" \
        --cross-reference="inventory_location_name|$LOCATION.name" \
        --cross-reference="corp_id|$GL.corp_acct_no" \
        --cross-reference="corp_name|$GL.corp_acct_name"
