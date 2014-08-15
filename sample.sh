@@ -133,7 +133,7 @@ iexport --table=$ITEM --output="$TMP/$ITEM.csv" -f csv --no-quote-empty --quotes
         --exclude="id, validation_errors, group_index"
 
 # 3) Put the above 3 CSV files into one Excel file /tmp/report.xls
-# This can be done using imerge which takes a list of CSV files put them to corresponding sheets
+# This can be done using the imerge utility which takes a list of CSV files and put them into corresponding sheets
 # of one single Excel file
 imerge --output=$REPORT \
        --input="Summary:$TMP/summary.csv" \
