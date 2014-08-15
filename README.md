@@ -61,8 +61,8 @@ For example:
     # Check if value of status is either 'A' or 'I' (any other value is not allowed)
     ivalidate --match="status/^(A|I)$/"
 ```
-In case you need even more customized validation other than the supported ones (match, unique, not-null, cross-reference...)
-then `--query` switch may be helpful. For example:
+In case you need even more customized validation other than the supported ones (`match`, `unique`, `not-null`, `cross-reference`...)
+then the `--query` switch may come in handy. For example:
 ```
     ivalidate --query="start_date >= string_to_date('01/02/2014') -- invalid date"
 ``` 
