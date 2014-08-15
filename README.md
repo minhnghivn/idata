@@ -64,7 +64,7 @@ For example:
 In case you need even more customized validation other than the supported ones (match, unique, not-null, cross-reference...)
 then `--query` switch may be helpful. For example:
 ```
-    ivalidate --query="string_to_date(start_date) >= '01/02/2014' -- invalid date"
+    ivalidate --query="start_date >= string_to_date('01/02/2014') -- invalid date"
 ``` 
 You can also use `--rquery` which is the reversed counterpart of `--query`
 For example, the following two checks are equivalent, mark any record whose `start_date < '01/02/2014'` as "invalid date":
