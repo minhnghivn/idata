@@ -13,7 +13,7 @@
 # SET UP ENVIRONMENT VARIABLES
 ###################################################################################
 # Instead of passing PostgreSQL credentials as parameters to every validation command,
-# you can set the corresponding environment variables which can be used by the those commands
+# you can set the corresponding environment variables which can be used by those commands
 export HOST="localhost"
 export USERNAME="postgres"
 export PASSWORD="t0p!Secret"
