@@ -137,7 +137,7 @@ iexport --table=$ITEM --output="$TMP/$ITEM.csv" -f csv --no-quote-empty --quotes
 # of one single Excel file
 imerge --output=$REPORT \
        --input="Summary:$TMP/summary.csv" \
-       --input="$FVENDOR:$TMP/$VENDOR.csv" \
+       --input="VendorMaster:$TMP/$VENDOR.csv" \
        --input="ItemMaster:$TMP/$ITEM.csv"
 
 # CLEANUP
