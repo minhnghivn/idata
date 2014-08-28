@@ -26,7 +26,7 @@ Suppose we have an `items` table, and we want to validate its records against ce
 * `vendor_code` must not be null
 * `vendor_name` must not be null
 * The composite `[vendor_code, vendor_name]` must be unique
-* One `vendor_code` corresponds to only ONE `vendor_name` (in other words, there must not be two items with different `vendor_name` but with the same `item_code`)
+* One `vendor_code` corresponds to only ONE `vendor_name` (in other words, there must not be two items with different `vendor_name` but with the same `vendor_code`)
 and vice-versa
 * `vendor_code` must reference the `code` column in the `vendors` table
 
