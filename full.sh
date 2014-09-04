@@ -199,6 +199,9 @@ ivalidate --case-insensitive --pretty -t $GL \
        --match="exp_acct_no/[a-zA-Z0-9]/" \
        --not-null=exp_acct_name \
        --match="exp_acct_name/[a-zA-Z0-9]/" \
+       --not-null=fq_acct_no \
+       --unique=fq_acct_no \
+       --rquery="(fq_acct_no IS NOT NULL AND corp_acct_fmt IS NOT NULL AND fq_acct_no !~ ('^' || regexp_replace(replace(corp_acct_fmt, '-', '}-'), '(?=[abcABC])[A-Z]', '[0-9]{', 'g') || '}$')) -- Invalid fq_acct_no" \
        --consistent-by="corp_acct_no|corp_acct_name" \
        --consistent-by="corp_acct_name|corp_acct_no" \
        --consistent-by="exp_acct_no|corp_acct_no, corp_acct_name, cc_acct_no, cc_acct_name, exp_acct_name" \
@@ -244,6 +247,8 @@ ivalidate --case-insensitive --pretty -t $LOCATION \
 
 # validate CONTRACTS ORIGINAL
 # @note Check unique keyset with item_id included for MSCM only
+# Accepted:
+#   --not-null=contract_gpo_name \
 ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --log-to=validation_errors \
        --not-null=contract_number \
@@ -257,7 +262,6 @@ ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --not-null=item_descr \
        --not-null=item_qoe \
        --not-null=contract_price \
-       --not-null=contract_gpo_name \
        --not-null=contract_gpo_id \
        --match="contract_number/[a-zA-Z0-9]/" \
        --match="contract_gpo_name/[a-zA-Z0-9]/" \
@@ -267,6 +271,7 @@ ivalidate --case-insensitive --pretty -t $CONTRACTO \
        --match="vendor_name/[a-zA-Z0-9]/" \
        --match="mfr_item_id/[a-zA-Z0-9]/" \
        --match="mfr_name/[a-zA-Z0-9]/" \
+       --rquery="(lower(mfr_name) = 'unknown' AND mfr_number IS NULL) -- Unknown mfr_name" \
        --query="to_date(contract_end, 'YYYY-MM-DD') >= to_date(contract_start, 'YYYY-MM-DD') -- [contract_end] comes before [contract_start]" \
        --match="contract_status/^(1|2|3|A|I|Inactive|Active|Y)$/" \
        --match="item_status/^(1|2|3|A|I|Inactive|Active|Y)$/" \
@@ -304,6 +309,7 @@ ivalidate --case-insensitive --pretty -t $ITEM \
        --not-null="mfr_number" \
        --not-null="mfr_name" \
        --not-null="active" \
+       --rquery="(lower(mfr_name) = 'unknown' AND mfr_number IS NULL) -- Unknown mfr_name" \
        --match="corp_id/[a-zA-Z0-9]/" \
        --match="corp_name/[a-zA-Z0-9]/" \
        --match="vendor_code/[a-zA-Z0-9]/" \
@@ -361,6 +367,7 @@ ivalidate --case-insensitive --pretty -t $PO \
        --consistent-by="vendor_name|vendor_code" \
        --consistent-by="mfr_name|mfr_number" \
        --unique="po_no, po_line_number" \
+       --rquery="(lower(mfr_name) = 'unknown' AND mfr_number IS NULL) -- Unknown mfr_name" \
        --rquery="(item_id not like '%~%' and item_id not in (select item_id from items)) -- [item_id] does not reference [items.item_id]" \
        --cross-reference="vendor_code|$VENDOR.vendor_code" \
        --cross-reference="vendor_name|$VENDOR.vendor_name" \
