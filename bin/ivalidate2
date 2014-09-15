@@ -1,0 +1,365 @@
+#!/usr/bin/env ruby
+# DATA VALIDATOR
+#
+# @author Nghi Pham
+# @date April 2014
+#
+# Data validation includes:
+# * Uniqueness
+# * Integrity (cross reference)
+# * Data type: numeric, text, enum, etc.
+# * Data format: text size, text values, enum, inclusion, exclusion, etc.
+#
+# Issue ruby load.rb --help for guideline/examples
+#
+require 'optparse'
+require 'active_record'
+require 'rubygems'
+require 'logger'
+
+$options = {}
+parser = OptionParser.new("", 24) do |opts|
+  opts.banner = "\nProgram: Data Validator\nAuthor: MCKI\n\n"
+  
+  opts.on("-c", "--config FILE", "Configuration file") do |v|
+    $options[:config] = v
+  end
+  
+  opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
+    $options[:host] = v
+  end
+
+  opts.on("-d", "--database DATABASE", "PostgreSQL database") do |v|
+    $options[:database] = v
+  end
+
+  opts.on("-u", "--username USER", "PostgreSQL username") do |v|
+    $options[:username] = v
+  end
+
+  opts.on("-p", "--password PASSWORD", "PostgreSQL password") do |v|
+    $options[:password] = v
+  end
+
+  opts.on("-l", "--listen PORT", "PostgreSQL listen port (default to 5432)") do |v|
+    $options[:listen] = v
+  end
+
+  opts.on_tail('--help', 'Displays this help') do
+		puts opts, "", help
+    exit
+	end
+end
+
+def help
+  return ''
+end
+
+begin
+  parser.parse!
+rescue SystemExit => ex
+  exit
+end
+
+# Load parameters from ENVIRONMENT if exist
+$options[:host] ||= ENV['HOST']
+$options[:username] ||= ENV['USERNAME']
+$options[:password] ||= ENV['PASSWORD']
+$options[:listen] ||= ENV['LISTEN']
+$options[:database] ||= ENV['DATABASE']
+
+# validate parameters
+if $options[:config].nil?
+  puts "\nPlease specify config file: -c\n\n"
+  exit
+end
+
+if $options[:host].nil?
+  puts "\nPlease specify host name: -h\n\n"
+  exit
+end
+
+if $options[:database].nil?
+  puts "\nPlease specify PostgreSQL database name: -d\n\n"
+  exit
+end
+
+if $options[:username].nil?
+  puts "\nPlease specify PostgreSQL username: -u\n\n"
+  exit
+end
+
+# Default value
+$options[:listen] ||= 5432
+
+# Database dump
+ActiveRecord::Base.establish_connection(
+  'adapter' => 'postgresql',
+  'host' => $options[:host],
+  'database' => $options[:database],
+  'username' => $options[:username],
+  'password' => $options[:password],
+  'port' => $options[:listen],
+  'timeout' => 15000
+)
+
+class String
+  def not_null_sql
+    a = self.split(/\s*,\s*/)
+    sql = a.map{|s|
+      "#{s} IS NOT NULL AND length(trim(#{s}::text)) <> 0"
+    }.join(" AND ")
+    
+    "(#{sql})"
+  end
+  
+  def lower
+    a = self.split(/\s*,\s*/)
+    sql = a.map{|s|
+      "lower(#{s})"
+    }.join(",")
+    
+    sql
+  end
+
+  def black;          "\033[30m#{self}\033[0m" end
+  def red;            "\033[31m#{self}\033[0m" end
+  def green;          "\033[32m#{self}\033[0m" end
+  def brown;          "\033[33m#{self}\033[0m" end
+  def blue;           "\033[34m#{self}\033[0m" end
+  def magenta;        "\033[35m#{self}\033[0m" end
+  def cyan;           "\033[36m#{self}\033[0m" end
+  def gray;           "\033[37m#{self}\033[0m" end
+end
+
+class Logger
+  alias_method :_old_info, :info
+  alias_method :_old_warn, :warn
+  alias_method :_old_error, :error
+
+
+  def error(msg)
+    _old_error(msg.red)
+  end
+
+  def info(msg)
+    _old_info(msg.green)
+  end
+
+  def warn(msg)
+    _old_warn(msg.brown)
+  end
+end
+
+module IData
+  class Validator
+    SUPPORTED_RULES_REGEXP = /^\s*(not null|cross references|matches|not matches|custom query|custom query reversed|unique|consistent by)\s*/
+    DEFAULT_ERROR_FIELD = 'validation_errors'
+
+    def initialize(file)
+      @config = YAML.load_file(file)
+      @logger = Logger.new(STDOUT)
+      @logger.formatter = proc do |severity, datetime, progname, msg|
+        "#{severity}: #{datetime} - #{msg}\n"
+      end
+    end
+    
+    def start
+      @logger.info "Validation started!"
+      @config.each do |table, fields|
+        unless table_exists?(table)
+          @logger.error "Table #{table} does not exist!"
+          exit(0)
+        end
+        @logger.info "Validating table #{table}"
+        fields.each do |field|
+          field['validations'].each do |rule|
+            type, args = parse_rule(rule['rule'])
+            validate( rule.merge('table' => table, 'field' => field['field'], 'type' => type, 'args' => args) )
+          end
+        end
+      end
+
+      @logger.info "Validation done!"
+    end
+
+    def add_error_field(options)
+      error_field = options['log_to'] || DEFAULT_ERROR_FIELD
+      execute("ALTER TABLE #{options['table']} ADD COLUMN #{error_field} VARCHAR DEFAULT '';")
+    rescue Exception => ex
+
+    end
+    
+    def validate(options)
+      add_error_field(options)
+      case options['type']
+      
+      when 'not null'
+        validate_not_null(options)
+      when 'custom query'
+        validate_custom_query(options)
+      when 'custom query reversed'
+        validate_custom_query(options)
+      when 'matches'
+        validate_match(options)
+      when 'cross references'
+        validate_cross_reference(options)
+      when 'consistent by'
+        validate_consistent_by(options)
+      when 'unique'
+        validate_unique(options)
+      else
+        raise "Rule not recognized"
+      end
+    rescue Exception => ex
+      @logger.warn ex.message.split(/[\n]/).first.strip
+    end
+    
+    private
+    def parse_rule(rule)
+      # @todo
+      type = rule[SUPPORTED_RULES_REGEXP]
+      if type.nil?
+        @logger.error "Invalid rule: #{rule}"
+        exit(0)
+      end
+
+      type.strip!
+      args = rule.gsub(SUPPORTED_RULES_REGEXP, '').gsub(/(^\s*["']|["']\s*$)/, "")
+      return type, args
+    end
+
+    def validate_not_null(options)
+      @logger.info "Validating data presence: #{options['table']}.[#{options['field']}]"
+      options['error'] ||= "[#{options['field']}] is null"
+      execute <<-eos
+        #{ update_sql(options) }
+        WHERE #{options['field']} IS NULL OR length(trim(#{options['field']})) = 0;
+      eos
+    end
+    
+    def validate_custom_query(options)
+      @logger.info "Validating with custom query: #{options['args'][0..50]}#{(options['args'].size > 50) ? '...' : ''}"
+      options['error'] ||= "Unknown"
+      execute <<-eos
+        #{ update_sql(options) }
+        WHERE NOT (#{options['args']})
+      eos
+    end
+    
+    def validate_custom_query_reversed(options)
+      @logger.info "Validating with custom query: #{options['args'][0..50]}#{(options['args'].size > 50) ? '...' : ''}"
+      options['error'] ||= "Unknown"
+      execute <<-eos
+        #{ update_sql(options) }
+        WHERE (#{options['args']})
+      eos
+    end
+    
+    def validate_consistent_by(options)
+      @logger.info "Validating integrity: #{options['table']}.[#{options['field']}] #{options['rule']}"
+      options['error'] ||= "Same [#{options['field']}] but different [#{options['args']}]"
+
+      f1_case = f1 = options['field']
+      f2_case = f2 = options['args']
+
+      if options['case_insensitive']
+        f1_case = f1_case.lower
+        f2_case = f2_case.lower
+      end
+
+      execute <<-eos
+        #{ update_sql(options) }
+        WHERE id IN (
+          SELECT unnest(array_agg(id)) FROM #{options['table']}
+          WHERE #{f1.not_null_sql} AND #{f2.not_null_sql}
+          GROUP BY #{f2_case}
+          HAVING COUNT(distinct #{f1_case}) > 1
+        );
+      eos
+    end
+    
+    def validate_unique(options)
+      @logger.info "Validating uniqueness: #{options['table']}.[#{options['field']}]"
+      options['error'] ||= "[#{options['field']}] is not unique"
+
+      if options['case_insensitive']
+        f_lower = options['field'].lower
+      else
+        f_lower = options['field']
+      end
+      
+      execute <<-eos
+        #{ update_sql(options) }
+        WHERE id IN (
+          SELECT unnest(array_agg(id)) FROM #{options['table']} GROUP BY #{f_lower}
+          HAVING count(*) > 1
+        ) AND #{options['field'].not_null_sql};
+      eos
+    end
+    
+    def validate_cross_reference(options)
+      @logger.info "Validating reference: #{options['table']}.[#{options['field']}] #{options['rule']}"
+
+      options['error'] ||= "[#{options['field']}] does not reference [#{options['args']}]"
+
+      field = options['field']
+      ref_table, ref_field = options['args'].split(/[\.]/)
+
+      if options['args'].split(/[\.]/).size != 2
+        raise "Invalid rule"
+        exit(0)
+      end
+      
+      if options['case_insensitive']
+        join_condition = "on lower(origin.#{field}) = lower(target.#{ref_field})"
+      else
+        join_condition = "on origin.#{field}::text = target.#{ref_field}::text"
+      end
+
+      # @todo: poor performance here, think of a better SQL!!!
+      execute <<-eos
+        #{ update_sql(options) }
+        WHERE #{field} IN (
+          SELECT origin.#{field} from #{options['table']} origin LEFT JOIN #{ref_table} target
+          #{join_condition}
+          where target.#{ref_field} is null
+        ) AND #{field} IS NOT NULL AND length(trim(#{field})) <> 0;
+      eos
+    end
+    
+    def validate_match(options)
+      @logger.info "Validating regexp: #{options['table']}.[#{options['field']}] #{options['rule']}"
+      options['error'] ||= "[#{options['field']}] does not match #{options['args']}"
+      execute <<-eos
+        #{ update_sql(options) }
+        WHERE #{options['field']} IS NOT NULL AND length(trim(#{options['field']})) <> 0 AND #{options['field']} !~ '#{options['args']}';
+      eos
+    end
+    
+    def update_sql(options)
+      log_to = options['log_to'] || DEFAULT_ERROR_FIELD
+      sql = "UPDATE #{options['table']} SET #{log_to} = array_to_string(string_to_array(#{log_to}, ' || ') || string_to_array(#{quote(options['error'])}, ' || '), ' || ')"
+    end
+    
+    def execute(sql)
+      ActiveRecord::Base.connection.execute(sql)
+    end
+    
+    def quote(str = "")
+      ActiveRecord::Base.connection.quote(str)
+    end
+
+    def table_exists?(table)
+      results = execute "
+        SELECT * FROM pg_tables WHERE schemaname='public' AND tablename = #{quote(table)};
+      "
+      return !results.first.nil?
+    end
+  end
+end
+
+
+x = IData::Validator.new $options[:config]
+x.start
+
