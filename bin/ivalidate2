@@ -155,6 +155,7 @@ module IData
   class Validator
     SUPPORTED_RULES_REGEXP = /^\s*(not null|cross references|matches|not matches|custom query|custom query reversed|unique|consistent by)\s*/
     DEFAULT_ERROR_FIELD = 'validation_errors'
+    META_TABLE = 'validation_meta'
 
     def initialize(file)
       @config = YAML.load_file(file)
@@ -163,9 +164,13 @@ module IData
         "#{severity}: #{datetime} - #{msg}\n"
       end
     end
-    
+
     def start
+      # reset the meta table
+      execute("DROP TABLE IF EXISTS #{META_TABLE}; CREATE TABLE #{META_TABLE} (code VARCHAR, tablename VARCHAR, fieldname VARCHAR, rule VARCHAR);")
+
       @logger.info "Validation started!"
+      meta = []
       @config.each do |table, fields|
         unless table_exists?(table)
           @logger.error "Table #{table} does not exist!"
@@ -175,9 +180,18 @@ module IData
         fields.each do |field|
           field['validations'].each do |rule|
             type, args = parse_rule(rule['rule'])
-            validate( rule.merge('table' => table, 'field' => field['field'], 'type' => type, 'args' => args) )
+            options = rule.merge('table' => table, 'field' => field['field'], 'type' => type, 'args' => args)
+            options['code'] = Digest::SHA1.hexdigest([table, field['field'], rule['rule']].join(""))
+            validate( options )
+
+            # meta            
+            meta << {code: options[:code], tablename: table, fieldname: field['field'], rule: rule['rule']}
           end
         end
+      end
+
+      meta.each do |r|
+        execute("INSERT INTO #{META_TABLE}(code, tablename, fieldname, rule) VALUES(#{quote(r[:code])}, #{quote(r[:tablename])}, #{quote(r[:fieldname])}, #{quote(r[:rule])});")
       end
 
       @logger.info "Validation done!"
@@ -339,7 +353,7 @@ module IData
     
     def update_sql(options)
       log_to = options['log_to'] || DEFAULT_ERROR_FIELD
-      sql = "UPDATE #{options['table']} SET #{log_to} = array_to_string(string_to_array(#{log_to}, ' || ') || string_to_array(#{quote(options['error'])}, ' || '), ' || ')"
+      sql = "UPDATE #{options['table']} SET #{log_to} = array_to_string(string_to_array(#{log_to}, ' || ') || string_to_array(#{quote(options['code'])}, ' || '), ' || ')"
     end
     
     def execute(sql)
@@ -351,9 +365,7 @@ module IData
     end
 
     def table_exists?(table)
-      results = execute "
-        SELECT * FROM pg_tables WHERE schemaname='public' AND tablename = #{quote(table)};
-      "
+      results = execute "SELECT * FROM pg_tables WHERE schemaname='public' AND tablename = #{quote(table)};"
       return !results.first.nil?
     end
   end
