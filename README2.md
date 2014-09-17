@@ -19,7 +19,7 @@ table:
 + Các field khác free text trên cùng 1 line, dùng \n làm dấu cách dòng
 + Giá trị của field có thể là một hoặc tập gồm nhiều field name, separated by comma
 
-## Writing rules:
+## Writing rules
 Supported rules include:
 
 | Rule | Description | Example |
@@ -30,7 +30,7 @@ Supported rules include:
 | `not matches "/regexp/"` | Reverse counterpart của `matches` | |
 | `consistent by "ref"` | Giá trị của field tương ứng phải consistent với `ref` | |
 | `cross references "table.field"` | Giá trị của field phải reference tới một field khác `table.field` | |
-| `custom query "query"` | Dùng custom SQL (trong trường hợp business phức tạp không thể biểu diễn bằng các rule khác) | |
+| `custom query "query"` | Dùng custom SQL `query` (trong trường hợp business phức tạp không thể biểu diễn bằng các rule khác) | |
 | `reverse query "query"` | Reverse counterpart của `custom query` | |
 
 ## Others
