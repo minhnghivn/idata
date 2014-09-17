@@ -1,7 +1,7 @@
 ### Overview
 File dùng cho validation criteria có cấu trúc chung như sau:
 ```yaml
-table1:
+table:
 - field: field_name
   validations: can be more than one
     - rule: (not null|matches|consistent by|cross references|unique|custom query|reverse query)
@@ -9,14 +9,6 @@ table1:
       error: custom error message
       solution: solution if this is encountered
       impact: the impact this has
-table2:
-- field: vendor_code, vendor_name
-  validations:
-    - rule: unique
-      code: 501
-      error: [vendor_code, vendor_name] must be unique
-      solution: skip
-      impact: blah blah
 ```
 
 #### Explain:
