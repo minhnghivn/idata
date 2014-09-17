@@ -2,13 +2,13 @@
 File dùng cho validation criteria có cấu trúc chung như sau:
 ```yaml
 table:
-- field: field_name
-  validations: can be more than one
-    - rule: (not null|matches|consistent by|cross references|unique|custom query|reverse query)
-      code: custom error code
-      error: custom error message
-      solution: solution if this is encountered
-      impact: the impact this has
+- field: field1, field2, etc.
+  validations:
+    - rule:
+      code:
+      error:
+      impact:
+      solution:
 ```
 
 #### Explain:
