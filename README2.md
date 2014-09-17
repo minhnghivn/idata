@@ -11,7 +11,7 @@ table:
       solution:
 ```
 
-#### Explain:
+##### Explain:
 + Một `table` có một hoặc nhiều `field`
 + Một `field` có một section `validations` chứa một hoặc nhiều rules
 + Mỗi rule chứa `rule` (required) và `code`, `error`, `solution`, `impact`, `priority` tương ứng (optional)
