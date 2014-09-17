@@ -34,12 +34,12 @@ Supported rules include:
 | ---- | ----------- | ------- |
 | `not null` | Giá trị của field tương ứng không được rỗng |  |
 | `unique` | Giá trị của field tương ứng phải unique trong table |  |
-| `matches` "/regexp/" | Giá trị của field phải thỏa format định nghĩa bởi `regexp` | |
-| `not matches` "/regexp/" | Reverse counterpart của `matches` | |
-| `consistent by` "ref" | Giá trị của field tương ứng phải consistent với `ref` | |
-| `cross references` "table.field" | Giá trị của field phải reference tới một field khác `table.field` | |
-| `custom query` | Dùng custom SQL (trong trường hợp business phức tạp không thể biểu diễn bằng các rule khác) | |
-| `reverse query` | Reverse counterpart của | |
+| `matches "/regexp/"` | Giá trị của field phải thỏa format định nghĩa bởi `regexp` | |
+| `not matches "/regexp/"` | Reverse counterpart của `matches` | |
+| `consistent by "ref"` | Giá trị của field tương ứng phải consistent với `ref` | |
+| `cross references "table.field"` | Giá trị của field phải reference tới một field khác `table.field` | |
+| `custom query "query"` | Dùng custom SQL (trong trường hợp business phức tạp không thể biểu diễn bằng các rule khác) | |
+| `reverse query "query"` | Reverse counterpart của | |
 
 ## Others
 TBD
