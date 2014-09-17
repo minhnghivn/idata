@@ -31,7 +31,7 @@ Supported rules include:
 | `consistent by "ref"` | Giá trị của field tương ứng phải consistent với `ref` | |
 | `cross references "table.field"` | Giá trị của field phải reference tới một field khác `table.field` | |
 | `custom query "query"` | Dùng custom SQL (trong trường hợp business phức tạp không thể biểu diễn bằng các rule khác) | |
-| `reverse query "query"` | Reverse counterpart của | |
+| `reverse query "query"` | Reverse counterpart của `custom query` | |
 
 ## Others
 TBD
