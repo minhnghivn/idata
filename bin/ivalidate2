@@ -153,58 +153,75 @@ end
 
 module IData
   class Validator
-    SUPPORTED_RULES_REGEXP = /^\s*(not null|cross references|matches|not matches|custom query|custom query reversed|unique|consistent by)\s*/
+    SUPPORTED_RULES_REGEXP = /^\s*(not null|cross references|matches|not matches|custom query|reverse query|unique|consistent by)\s*/
     DEFAULT_ERROR_FIELD = 'validation_errors'
     META_TABLE = 'validation_meta'
+    SUMMARY_TABLE = 'summary'
 
     def initialize(file)
       @config = YAML.load_file(file)
       @logger = Logger.new(STDOUT)
+      @rules = []
       @logger.formatter = proc do |severity, datetime, progname, msg|
         "#{severity}: #{datetime} - #{msg}\n"
       end
-    end
-
-    def start
-      # reset the meta table
-      execute("DROP TABLE IF EXISTS #{META_TABLE}; CREATE TABLE #{META_TABLE} (code VARCHAR, tablename VARCHAR, fieldname VARCHAR, rule VARCHAR);")
-
-      @logger.info "Validation started!"
-      meta = []
       @config.each do |table, fields|
         unless table_exists?(table)
-          @logger.error "Table #{table} does not exist!"
-          exit(0)
+          @logger.warn "Table #{table} does not exist!"
         end
         @logger.info "Validating table #{table}"
         fields.each do |field|
           field['validations'].each do |rule|
+            p rule
             type, args = parse_rule(rule['rule'])
             options = rule.merge('table' => table, 'field' => field['field'], 'type' => type, 'args' => args)
             options['code'] = Digest::SHA1.hexdigest([table, field['field'], rule['rule']].join(""))
-            validate( options )
-
-            # meta            
-            meta << {code: options[:code], tablename: table, fieldname: field['field'], rule: rule['rule']}
+            @rules << options
           end
         end
       end
+    end
 
-      meta.each do |r|
-        execute("INSERT INTO #{META_TABLE}(code, tablename, fieldname, rule) VALUES(#{quote(r[:code])}, #{quote(r[:tablename])}, #{quote(r[:fieldname])}, #{quote(r[:rule])});")
-      end
+    def validate!
+      # reset the meta table
+      execute("DROP TABLE IF EXISTS #{META_TABLE}")
 
+      # validate
+      @logger.info "Validation started!"
+      @rules.each {|r| validate(r) }
+
+      # create meta table
+      create_table_from_array(@rules, table_name: META_TABLE, drop_table: true, extra_fields: ['impact', 'solution', 'count', 'percentage'])
+
+      # Done!
       @logger.info "Validation done!"
     end
 
-    def add_error_field(options)
-      error_field = options['log_to'] || DEFAULT_ERROR_FIELD
-      execute("ALTER TABLE #{options['table']} ADD COLUMN #{error_field} VARCHAR DEFAULT '';")
-    rescue Exception => ex
+    def create_table_from_array(entries, options = {})
+      raise "Please specify :table_name" unless options[:table_name]
 
+      extra_fields = options[:extra_fields] || []
+      columns = entries.inject([]) {|x, i| x += i.keys } + extra_fields
+      columns.uniq!
+
+      if options[:drop_table] 
+        execute "DROP TABLE IF EXISTS #{options[:table_name]}"
+      end
+
+      execute "CREATE TABLE IF NOT EXISTS #{options[:table_name]} ( #{columns.map{|c| quote_col_name(c.to_s) + ' VARCHAR' }.join(', ')} )"
+
+      insert_sql = entries.map { |r|
+        "INSERT INTO #{options[:table_name]}(#{columns.map{|c| quote_col_name(c.to_s)}.join(', ')}) VALUES(#{ columns.map{|c| quote(r[c])}.join(',') });"
+      }.join("")
+
+      execute insert_sql
     end
     
     def validate(options)
+      unless table_exists?(options['table'])
+        return
+      end
+
       add_error_field(options)
       case options['type']
       
@@ -212,6 +229,8 @@ module IData
         validate_not_null(options)
       when 'custom query'
         validate_custom_query(options)
+      when 'reverse query'
+        validate_reverse_query(options)
       when 'custom query reversed'
         validate_custom_query(options)
       when 'matches'
@@ -228,8 +247,29 @@ module IData
     rescue Exception => ex
       @logger.warn ex.message.split(/[\n]/).first.strip
     end
+
+    def report!
+      sql = @rules.map {|r|
+        "(SELECT unnest(string_to_array(#{DEFAULT_ERROR_FIELD}, ' || ')) as code, count(*), round((count(*) * 100)::numeric / (SELECT count(*) FROM #{r['table']}), 2)::varchar || '%' AS percentage FROM #{r['table']} GROUP BY code)"
+      }
+      
+      execute("
+        UPDATE #{META_TABLE} meta
+        SET count = stat.count,
+            percentage = stat.percentage
+        FROM (#{sql.join(" UNION ")}) stat
+        WHERE meta.code = stat.code"
+      )
+    end
     
     private
+    def add_error_field(options)
+      error_field = options['log_to'] || DEFAULT_ERROR_FIELD
+      execute("ALTER TABLE #{options['table']} ADD COLUMN #{error_field} VARCHAR DEFAULT '';")
+    rescue Exception => ex
+      # @todo
+    end
+
     def parse_rule(rule)
       # @todo
       type = rule[SUPPORTED_RULES_REGEXP]
@@ -261,7 +301,7 @@ module IData
       eos
     end
     
-    def validate_custom_query_reversed(options)
+    def validate_reverse_query(options)
       @logger.info "Validating with custom query: #{options['args'][0..50]}#{(options['args'].size > 50) ? '...' : ''}"
       options['error'] ||= "Unknown"
       execute <<-eos
@@ -364,14 +404,23 @@ module IData
       ActiveRecord::Base.connection.quote(str)
     end
 
+    def quote_col_name(str = "")
+      ActiveRecord::Base.connection.quote_column_name(str)
+    end
+
     def table_exists?(table)
       results = execute "SELECT * FROM pg_tables WHERE schemaname='public' AND tablename = #{quote(table)};"
       return !results.first.nil?
+    end
+
+    def drop_table(table_name)
+      execute "DROP TABLE IF EXISTS #{table_name}"
     end
   end
 end
 
 
 x = IData::Validator.new $options[:config]
-x.start
+x.validate!
+x.report!
 
