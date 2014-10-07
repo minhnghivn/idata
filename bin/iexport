@@ -14,6 +14,7 @@ require 'active_record'
 require 'rubygems'
 require 'digest/sha1'
 require 'fileutils'
+require 'sqlite3'
 
 SUPPORTED_INPUT_FORMATS = ['CSV']
 POSTGRESQL_PORT = 5432
@@ -79,6 +80,10 @@ parser = OptionParser.new("", 24) do |opts|
 
   opts.on("-o", "--output FILE", "Output file") do |v|
     $options[:output] = v
+  end
+  
+  opts.on("--sqlitedb PATH", "Path to SQLite3 database file") do |v|
+    $options[:sqlitedb] = v
   end
 
   opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
@@ -157,20 +162,31 @@ if $options[:output].nil?
   exit
 end
 
-if $options[:host].nil?
+if $options[:host].nil? && $options[:sqlitedb].nil?
   puts "\nPlease specify host name: -h\n\n"
   exit
 end
 
-if $options[:database].nil?
+if $options[:database].nil? && $options[:sqlitedb].nil?
   puts "\nPlease specify PostgreSQL database name: -d\n\n"
   exit
 end
 
-if $options[:username].nil?
+if $options[:username].nil? && $options[:sqlitedb].nil?
   puts "\nPlease specify PostgreSQL username: -u\n\n"
   exit
 end
+
+if ($options[:host] || $options[:username] || $options[:listen] || $options[:password]) && $options[:sqlitedb]
+  puts "\nYou cannot specify both PostgreSQL ('host', 'username', 'listen', 'password') and SQLite ('sqlitedb') parameters \n\n"
+  exit
+end
+
+if $options[:sqlitedb] && !File.exists?($options[:sqlitedb])
+  puts "\nFile does not exist '#{$options[:sqlitedb]}'\n\n"
+  exit
+end
+
 
 # Default value
 $options[:listen] ||= POSTGRESQL_PORT
@@ -182,7 +198,7 @@ $options[:headers] ||= false
 $options[:quotes] ||= false
 $options[:quote_empty] ||= false
 $options[:select] ||= '*'
-$options[:where] ||= 'true'
+$options[:where] ||= ( $options[:sqlitedb].nil? ) ? 'true' : '1=1'
 $options[:include] ||= ""
 
 # Do not quote the '"' char
@@ -203,16 +219,23 @@ end
 
 $options[:select] = [$options[:select].split(/\s*,\s*/) + $options[:include].split(/\s*,\s*/)].join(", ")
 
-#$options = {host: 'localhost', database: 'db', username: 'postgres', password: 'postgres', table: 'products', listen: 5432}
-ActiveRecord::Base.establish_connection(
-  'adapter' => 'postgresql',
-  'host' => $options[:host],
-  'database' => $options[:database],
-  'username' => $options[:username],
-  'password' => $options[:password],
-  'port' => $options[:listen],
-  'timeout' => 15000
-)
+if $options[:sqlitedb]
+  ActiveRecord::Base.establish_connection(
+    'adapter' => 'sqlite3',
+    'database' => $options[:sqlitedb],
+    'timeout' => 15000
+  )
+else
+  ActiveRecord::Base.establish_connection(
+    'adapter' => 'postgresql',
+    'host' => $options[:host],
+    'database' => $options[:database],
+    'username' => $options[:username],
+    'password' => $options[:password],
+    'port' => $options[:listen],
+    'timeout' => 15000
+  )
+end
 
 class Product < ActiveRecord::Base
   self.table_name = $options[:table]
