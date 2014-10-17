@@ -33,5 +33,59 @@ Supported rules include:
 | `custom query "query"` | Dùng custom SQL `query` (trong trường hợp business phức tạp không thể biểu diễn bằng các rule khác) | |
 | `reverse query "query"` | Reverse counterpart của `custom query` | |
 
+Query the validation log
+=========
+Look at the below illustration for the schema of `log` table
+![log schema](https://s3-ap-southeast-1.amazonaws.com/mycdn1104/log.png)
+#### Some common queries
+List of IDL tables
+```
+.tables
+```
+List of tables and errors found
+```
+SELECT distinct table_name, error FROM log;
+```
+List of tables, errors and item count for every error
+```
+SELECT table_name, error, count(*) FROM log GROUP BY table_name, error;
+```
+List of tables and error count
+```
+SELECT table_name, count(DISTINCT error) FROM log GROUP BY table_name;
+```
+Delete `vendors` with a particular error:
+```
+DELETE FROM vendors WHERE rowid IN (SELECT id FROM log WHERE error = 'invalid vendor name' AND table_name = 'vendors');
+```
+Delete *all* `vendors` with error:
+```
+DELETE FROM vendors WHERE rowid IN (SELECT id FROM log WHERE table_name = 'vendors');
+```
+#### Some common queries
+List of IDL tables
+```
+.tables
+```
+List of tables and errors found
+```
+SELECT distinct table_name, error FROM log;
+```
+List of tables, errors and item count for every error
+```
+SELECT table_name, error, count(*) FROM log GROUP BY table_name, error;
+```
+List of tables and error count
+```
+SELECT table_name, count(DISTINCT error) FROM log GROUP BY table_name;
+```
+Delete `vendors` with a particular error:
+```
+DELETE FROM vendors WHERE rowid IN (SELECT id FROM log WHERE error = 'invalid vendor name' AND table_name = 'vendors');
+```
+Delete *all* `vendors` with error:
+```
+DELETE FROM vendors WHERE rowid IN (SELECT id FROM log WHERE table_name = 'vendors');
+```
 ## Others
 TBD
