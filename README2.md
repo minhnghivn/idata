@@ -62,30 +62,6 @@ Delete *all* `vendors` with error:
 ```
 DELETE FROM vendors WHERE rowid IN (SELECT id FROM log WHERE table_name = 'vendors');
 ```
-#### Some common queries
-List of IDL tables
-```
-.tables
-```
-List of tables and errors found
-```
-SELECT distinct table_name, error FROM log;
-```
-List of tables, errors and item count for every error
-```
-SELECT table_name, error, count(*) FROM log GROUP BY table_name, error;
-```
-List of tables and error count
-```
-SELECT table_name, count(DISTINCT error) FROM log GROUP BY table_name;
-```
-Delete `vendors` with a particular error:
-```
-DELETE FROM vendors WHERE rowid IN (SELECT id FROM log WHERE error = 'invalid vendor name' AND table_name = 'vendors');
-```
-Delete *all* `vendors` with error:
-```
-DELETE FROM vendors WHERE rowid IN (SELECT id FROM log WHERE table_name = 'vendors');
-```
+
 ## Others
 TBD
