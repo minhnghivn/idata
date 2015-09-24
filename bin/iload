@@ -52,8 +52,8 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:table] = v
   end
   
-  opts.on("--append", "") do |v|
-    $options[:append] = v
+  opts.on("--drop", "") do |v|
+    $options[:drop] = v
   end
 
   opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
@@ -159,7 +159,7 @@ end
 $options[:listen] ||= POSTGRESQL_PORT
 $options[:delim] ||= CSV_DEFAULT_DELIMITER
 $options[:quote] ||= CSV_DEFAULT_QUOTE
-$options[:append] ||= false
+$options[:drop] ||= false
 
 $tmpfile = "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
 
@@ -263,7 +263,7 @@ class MyParser
 
   def create_table_from_csv(csv_path)
     # Get headers
-    csv = CSV.open(csv_path, :headers => true, :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE)
+    csv = CSV.open(csv_path, :headers => true, :col_sep => $options[:delim], :quote_char => CSV_DEFAULT_QUOTE)
     
     first = csv.first
     unless first
@@ -285,7 +285,7 @@ class MyParser
     end
 
     # Create table
-    if !$options[:append]
+    if $options[:drop]
       drop_table_sql = "drop table if exists #{$options[:table]};"
     else
       drop_table_sql = ""

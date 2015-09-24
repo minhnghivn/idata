@@ -35,7 +35,7 @@ Supported rules include:
 
 Query the validation log
 =========
-Look at the below illustration for the schema of `log` table
+Look at the illustration below for the schema of `log` table
 ![log schema](https://s3-ap-southeast-1.amazonaws.com/mycdn1104/log.png)
 #### Some common queries
 List of IDL tables
