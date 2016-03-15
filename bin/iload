@@ -357,7 +357,11 @@ class MyParser
 
   private
   def query(*query_str)
-    Organization.connection.execute(query_str.join("; "))
+    if $options[:client]
+      Organization.connection.execute(query_str.join("; "))
+    else
+      ActiveRecord::Base.connection.execute(query_str.join("; "))
+    end
   end
 end
 
