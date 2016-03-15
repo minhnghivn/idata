@@ -17,8 +17,15 @@ require 'fileutils'
 
 SUPPORTED_INPUT_FORMATS = ['CSV', 'FX', 'RPT']
 POSTGRESQL_PORT = 5432
+POSTGRESQL_USERNAME = 'postgres'
 CSV_DEFAULT_DELIMITER = ','
 CSV_DEFAULT_QUOTE = '"'
+CSV_DEFAULT_FORMAT = 'CSV'
+
+def error(msg)
+  puts "Error: #{msg}"
+  exit(-1)
+end
 
 $options = {}
 parser = OptionParser.new("", 24) do |opts|
@@ -104,76 +111,112 @@ rescue SystemExit => ex
   exit
 end
 
-# Load parameters from ENVIRONMENT if exist
-$options[:host] ||= ENV['HOST']
-$options[:username] ||= ENV['USERNAME']
-$options[:password] ||= ENV['PASSWORD']
-$options[:listen] ||= ENV['LISTEN']
-$options[:database] ||= ENV['DATABASE']
-
-# validate parameters
-if $options[:input].nil?
-  puts "\nPlease specify input file: -i\n\n"
-  exit
-end
-
-if $options[:format].nil?
-  puts "\nPlease specify input file format: -f\n\n"
-  exit
-end
-
-# downcase for consistency
-$options[:format].upcase!
-
-if !SUPPORTED_INPUT_FORMATS.include?($options[:format])
-  puts "\nInvalid input file format, supported formats are: #{SUPPORTED_INPUT_FORMATS.join(', ')}\n\n"
-  exit
-end
-
-if $options[:table].nil?
-  puts "\nPlease specify table name: -t\n\n"
-  exit
-end
-
-unless File.exists?($options[:input])
-  puts "\nFile does not exist"
-  exit
-end
-
-if $options[:host].nil?
-  puts "\nPlease specify host name: -h\n\n"
-  exit
-end
-
-if $options[:database].nil?
-  puts "\nPlease specify PostgreSQL database name: -d\n\n"
-  exit
-end
-
-if $options[:username].nil?
-  puts "\nPlease specify PostgreSQL username: -d\n\n"
-  exit
-end
-
-# Default value
-$options[:listen] ||= POSTGRESQL_PORT
+# default
+$options[:format].upcase! if $options[:format]
+$options[:format] ||= CSV_DEFAULT_FORMAT
+$options[:listen] ||= POSTGRESQL_PORT unless $options[:client]
+$options[:username] ||= POSTGRESQL_USERNAME unless $options[:client]
 $options[:delim] ||= CSV_DEFAULT_DELIMITER
 $options[:quote] ||= CSV_DEFAULT_QUOTE
 $options[:drop] ||= false
 
+# extra options
+$options[:client] = ARGV[0] if ARGV[0]
+
+# validate parameters
+if $options[:input].nil?
+  error "please specify input file: -i"
+end
+
+if File.exists?($options[:input]) && File.directory?($options[:input])
+  error "`#{$options[:input]}` is a directory! input must be a file"
+end
+
+unless File.exists?($options[:input])
+  error "file `#{$options[:input]}` not found!"
+end
+
+if !SUPPORTED_INPUT_FORMATS.include?($options[:format])
+  error "invalid input file format, supported formats are: #{SUPPORTED_INPUT_FORMATS.join(', ')}"
+end
+
+if $options[:table].nil?
+  error "Please specify table name: -t"
+end
+
+if $options[:client] and ($options[:host] or $options[:database] or $options[:username] or $options[:password])
+  error "once client name (#{$options[:client]}) is specified, -h/-u/-d/-p is no longer needed"
+end
+
+if ARGV.count > 1
+  error "too many arguments!"
+end
+
+if $options[:client]
+  if ENV['MAINDBNAME'].blank?
+    error "the environment variable MAINDBNAME is not present"
+  end
+  
+  if ENV['MAINDBHOST'].blank?
+    error "the environment variable MAINDBHOST is not present"
+  end
+  
+  ActiveRecord::Base.establish_connection(
+    'adapter' => 'postgresql',
+    'host' => ENV['MAINDBHOST'],
+    'database' => ENV['MAINDBNAME'],
+    'username' => ENV['MAINDBUSER'] || POSTGRESQL_USERNAME,
+    'port' => ENV['MAINDBPORT'] || POSTGRESQL_PORT,
+    'timeout' => 15000
+  )
+  
+  class Organization < ActiveRecord::Base
+  end
+  
+  client = Organization.where("name ilike ? AND name NOT ilike 'MSSS'", $options[:client]).first
+  unless client
+    error "cannot find client with such name: `#{$options[:client]}`"
+  else
+    Organization.establish_connection(
+      'adapter' => 'postgresql',
+      'host' => client.db_ipaddress,
+      'database' => client.db_name,
+      'username' => client.db_username,
+      'port' => client.db_port,
+      'timeout' => 15000
+    )
+    
+    $options[:database] = client.db_name
+    $options[:username] = client.db_username
+    $options[:host] = client.db_ipaddress
+    $options[:listen] = client.db_port
+  end
+else
+  if $options[:host].nil?
+    error "please specify host name: -h"
+  end
+
+  if $options[:database].nil?
+    error "please specify database name: -d"
+  end
+
+  if $options[:username].nil?
+    error "please specify username: -u"
+  end
+
+  # Database dump
+  ActiveRecord::Base.establish_connection(
+    'adapter' => 'postgresql',
+    'host' => $options[:host],
+    'database' => $options[:database],
+    'username' => $options[:username],
+    'password' => $options[:password],
+    'port' => $options[:listen],
+    'timeout' => 15000
+  )
+end
+
 $tmpfile = "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
-
-# Database dump
-ActiveRecord::Base.establish_connection(
-  'adapter' => 'postgresql',
-  'host' => $options[:host],
-  'database' => $options[:database],
-  'username' => $options[:username],
-  'password' => $options[:password],
-  'port' => $options[:listen],
-  'timeout' => 15000
-)
-
 $csv_converters = [:stripper]
 
 CSV::Converters[:stripper] = lambda{ |s|
@@ -202,10 +245,6 @@ end
 
 class MyParser
   def initialize
-    # remote server always requires password
-    if !local? and $options[:password].nil?
-      raise "You are connecting to a remote server\nPlease make sure you specify SQL password: --password "
-    end
   end
 
   def run  
@@ -281,7 +320,7 @@ class MyParser
     
     # check if every field name is unique
     if headers.count != headers.uniq.count
-      raise "Field name must be UNIQUE: \nPlease check your input headers: [#{headers.sort.join(', ')}]"
+      error "duplicate field name: [#{headers.sort.join(', ')}]"
     end
 
     # Create table
@@ -297,34 +336,27 @@ class MyParser
     
     insert_data_sql = headers.map{|e| "\"#{e}\""}.join(",")
     insert_data_sql = "COPY #{$options[:table]}( #{insert_data_sql} ) FROM '#{csv_path}' DELIMITER ',' CSV HEADER"
+    insert_data_sql = "PGPASSWORD=#{$options[:password]} psql -U #{$options[:username]} -h #{$options[:host]} -p #{$options[:listen]} #{$options[:database]} -c \"\\#{insert_data_sql}\""
     
     # Change output file permission so that postgres user can read it
     begin
       FileUtils.chmod 0755, csv_path
     rescue Exception => ex
-      puts "Error while changing file permission"
-    end
-
-    if local?
-      query(insert_data_sql)
-    else
-      puts "\nWARNING: pushing data to remote server [#{$options[:host]}].\nBe sure you have the correct version of `psql` command installed\n\n"
-      insert_data_sql = "PGPASSWORD=#{$options[:username]} psql -U #{$options[:username]} -h #{$options[:host]} -p #{$options[:listen]} #{$options[:database]} -c \"\\#{insert_data_sql}\""
-
-      `#{insert_data_sql}`
-      `PGPASSWORD=""`
+      error "cannot change file permission"
     end
     
-    puts "\nTable `#{$options[:table]}` loaded \n\n"
+    # Execute    
+    `#{insert_data_sql}`
+    
+    # Clean up
+    File.delete(csv_path) if File.exists?(csv_path)
+    
+    puts "Table `#{$options[:table]}` loaded\n"
   end
 
   private
   def query(*query_str)
-    ActiveRecord::Base.connection.execute(query_str.join("; "))
-  end
-
-  def local?
-    return ['localhost', '127.0.0.1'].include?($options[:host])
+    Organization.connection.execute(query_str.join("; "))
   end
 end
 
