@@ -111,6 +111,14 @@ rescue SystemExit => ex
   exit
 end
 
+# extra options
+$options[:client] = ARGV[0] if ARGV[0]
+
+# cross-reference
+if $options[:client] and ($options[:host] or $options[:database] or $options[:username] or $options[:password])
+  error "once client name (#{$options[:client]}) is specified, -h/-u/-d/-p/-l is no longer needed"
+end
+
 # default
 $options[:format].upcase! if $options[:format]
 $options[:format] ||= CSV_DEFAULT_FORMAT
@@ -119,9 +127,6 @@ $options[:username] ||= POSTGRESQL_USERNAME unless $options[:client]
 $options[:delim] ||= CSV_DEFAULT_DELIMITER
 $options[:quote] ||= CSV_DEFAULT_QUOTE
 $options[:drop] ||= false
-
-# extra options
-$options[:client] = ARGV[0] if ARGV[0]
 
 # validate parameters
 if $options[:input].nil?
@@ -142,10 +147,6 @@ end
 
 if $options[:table].nil?
   error "Please specify table name: -t"
-end
-
-if $options[:client] and ($options[:host] or $options[:database] or $options[:username] or $options[:password])
-  error "once client name (#{$options[:client]}) is specified, -h/-u/-d/-p is no longer needed"
 end
 
 if ARGV.count > 1
