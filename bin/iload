@@ -303,7 +303,7 @@ class MyParser
 
   def create_table_from_csv(csv_path)
     # Get headers
-    csv = CSV.open(csv_path, :headers => true, :col_sep => $options[:delim], :quote_char => CSV_DEFAULT_QUOTE)
+    csv = CSV.open(csv_path, :headers => true, :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE)
     
     first = csv.first
     unless first
