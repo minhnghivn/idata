@@ -86,7 +86,7 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:database] = v
   end
 
-  opts.on("-u", "--username USER", "PostgreSQL username") do |v|
+  opts.on("-u", "--username USER", "PostgreSQL username (default to postgres)") do |v|
     $options[:username] = v
   end
 
