@@ -128,10 +128,10 @@ To use the short form, the following environment variables must be present:
     MAINDBNAME
     MAINDBPORT
 
-Column delimiter will be auto-detected, in case you want to overwrite the default, use --format/-f.
+Column delimiter will be auto-detected, in case you want to overwrite the default, use --delim.
 For example, tell the program to use TAB as delimiter:
     
-    iload maricopa --table=items --input=/user/items.csv --format=$'\\t'
+    iload maricopa --table=items --input=/user/items.csv --delim=$'\\t'
 
 eos
 end
