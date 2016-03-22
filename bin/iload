@@ -8,9 +8,21 @@
 # a corresponding table in the specified database
 # Issue ruby load.rb --help for guideline/examples
 #
+
+require 'idata'
 require 'optparse'
 require 'csv'
-require 'active_record'
+
+begin
+  require 'active_record'
+rescue Exception => ex
+end
+
+begin
+  require 'activerecord'
+rescue Exception => ex
+end
+
 require 'rubygems'
 require 'digest/sha1'
 require 'fileutils'
@@ -29,9 +41,13 @@ end
 
 $options = {}
 parser = OptionParser.new("", 24) do |opts|
-  opts.banner = "\nProgram: Data Loader\nAuthor: MCKi Team\nDescription: the program takes an input text file and creates a corresponding data table\n\n"
+  opts.banner = "Program: iload #{Idata::VERSION}\nAuthor: Gaugau\n\nUsage: iload <client name> [option]\n       iload [options]\n"
+  opts.version = Idata::VERSION
 
-  opts.on("-i", "--input INPUT", "Input text file") do |v|
+  opts.separator ""
+  opts.separator "Command options:"
+
+  opts.on("-i", "--input INPUT", "Input file") do |v|
     $options[:input] = v
   end
 
@@ -51,10 +67,6 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:quote] = v
   end
 
-  # opts.on("-o", "--output CSV", "Temporary CSV output file") do |v|
-  #   $options[:output] = v
-  # end
-
   opts.on("-t", "--table TABLE", "Table name to be created") do |v|
     $options[:table] = v
   end
@@ -62,6 +74,9 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("--drop", "") do |v|
     $options[:drop] = v
   end
+  
+  opts.separator ""
+  opts.separator "Connection options, can be ommited if <client name> is already specified:"
 
   opts.on("-h", "--host HOST", "PostgreSQL host") do |v|
     $options[:host] = v
@@ -82,25 +97,41 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("-l", "--listen PORT", "PostgreSQL listen port (default to 5432)") do |v|
     $options[:listen] = v
   end
+  
+  opts.separator ""
+  opts.separator "Common options:"
 
   opts.on_tail('--help', 'Displays this help') do
-		puts opts, "", help
+    puts opts, "", help
     exit
-	end
+  end
+	
 end
 
 def help
   return <<-eos
-
-EXAMPLES
+Example:
 -------------------------------------------------------
-Load data from text file and store to a table name "vendors"
+Load data from text file and store to a table name "items"
 
-    iload --host=localhost --username=postgres --password=postgres \\
-          --database=db --table=vendors \\
-          --input=/home/administrator/VendorMaster.txt \\
-          --format=CSV --delim=$'\\t'
+    iload --host=localhost --username=postgres --password=postgres --database=db 
+          --table=items --input=/user/items.csv
 
+In short form, with client-name specified:
+
+    iload maricopa --table=items --input=/user/items.csv
+
+To use the short form, the following environment variables must be present:
+
+    MAINDBHOST
+    MAINDBSER
+    MAINDBNAME
+    MAINDBPORT
+
+Column delimiter will be auto-detected, in case you want to overwrite the default, use --format/-f.
+For example, tell the program to use TAB as delimiter:
+    
+    iload maricopa --table=items --input=/user/items.csv --format=$'\\t'
 
 eos
 end
@@ -124,7 +155,6 @@ $options[:format].upcase! if $options[:format]
 $options[:format] ||= CSV_DEFAULT_FORMAT
 $options[:listen] ||= POSTGRESQL_PORT unless $options[:client]
 $options[:username] ||= POSTGRESQL_USERNAME unless $options[:client]
-$options[:delim] ||= CSV_DEFAULT_DELIMITER
 $options[:quote] ||= CSV_DEFAULT_QUOTE
 $options[:drop] ||= false
 
@@ -140,6 +170,9 @@ end
 unless File.exists?($options[:input])
   error "file `#{$options[:input]}` not found!"
 end
+
+# auto detect delimiter
+$options[:delim] ||= Idata::Detector::new($options[:input]).find
 
 if !SUPPORTED_INPUT_FORMATS.include?($options[:format])
   error "invalid input file format, supported formats are: #{SUPPORTED_INPUT_FORMATS.join(', ')}"
@@ -347,12 +380,15 @@ class MyParser
     end
     
     # Execute    
-    `#{insert_data_sql}`
+    `#{insert_data_sql} > /dev/null`
     
-    # Clean up
-    File.delete(csv_path) if File.exists?(csv_path)
-    
-    puts "Table `#{$options[:table]}` loaded\n"
+    if $?.exitstatus == 0 
+      # Clean up
+      File.delete(csv_path) if File.exists?(csv_path)
+      puts "Table `#{$options[:table]}` loaded\n"
+    else
+      puts "Something went wrong!"
+    end
   end
 
   private
