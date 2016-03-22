@@ -124,7 +124,7 @@ In short form, with client-name specified:
 To use the short form, the following environment variables must be present:
 
     MAINDBHOST
-    MAINDBSER
+    MAINDBUSER
     MAINDBNAME
     MAINDBPORT
 
