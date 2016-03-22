@@ -382,9 +382,10 @@ class MyParser
     # Execute    
     `#{insert_data_sql} > /dev/null`
     
+    # Clean up
+    File.delete(csv_path) if File.exists?(csv_path)
+      
     if $?.exitstatus == 0 
-      # Clean up
-      File.delete(csv_path) if File.exists?(csv_path)
       puts "Table `#{$options[:table]}` loaded\n"
     else
       puts "Something went wrong!"
