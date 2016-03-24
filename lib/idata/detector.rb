@@ -1,4 +1,9 @@
 require 'csv'
+
+# Set UTF-8
+Encoding.default_internal = Encoding::UTF_8
+Encoding.default_external = Encoding::UTF_8
+
 module Idata
   class Detector
     DEFAULT_DELIMITER = ","
@@ -7,7 +12,7 @@ module Idata
 
     def initialize(file)
       @file = file
-      @sample = `head -n #{SAMPLE_SIZE} #{@file}`
+      @sample = `head -n #{SAMPLE_SIZE} #{@file}`.encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '')
       @sample_lines = @sample.split(/[\r\n]+/)
       @candidates = COMMON_DELIMITERS.map { |delim|
         [delim, @sample.scan(delim).count]
