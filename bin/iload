@@ -296,7 +296,7 @@ class MyParser
     # Serialize array into a new CSV (with standard delimiter, quote) for later use with PostgreSQL
     CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE) do |writer|
       csv_data.each do |csv|
-        writer << csv
+        writer << csv unless csv.empty? # performance caveat here
       end
     end
     
@@ -363,9 +363,13 @@ class MyParser
     else
       drop_table_sql = ""
     end
-    
+
     create_table_sql = headers.map{|e| "\"#{e}\" text"}.join(",")
-    create_table_sql = "create table if not exists #{$options[:table]}( id serial not null, #{create_table_sql} );"
+    if headers.include? 'id'
+      create_table_sql = "create table if not exists #{$options[:table]}( #{create_table_sql} );"
+    else
+      create_table_sql = "create table if not exists #{$options[:table]}( id serial not null, #{create_table_sql} );"
+    end
     query(drop_table_sql, create_table_sql)
     
     insert_data_sql = headers.map{|e| "\"#{e}\""}.join(",")
