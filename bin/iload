@@ -139,7 +139,9 @@ end
 begin
   parser.parse!
 rescue SystemExit => ex
-  exit
+  exit 1
+rescue OptionParser::MissingArgument => ex
+  error ex.message
 end
 
 # extra options
