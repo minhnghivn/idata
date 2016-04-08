@@ -356,7 +356,7 @@ class MyParser
     
     # check if every field name is unique
     if headers.count != headers.uniq.count
-      error "duplicate field name: [#{headers.sort.join(', ')}]"
+      error "duplicate field name [#{headers.sort.join(', ')}]"
     end
 
     # Create table
@@ -408,10 +408,7 @@ class MyParser
   end
 end
 
-begin
-  e = MyParser.new
-  e.run
-rescue Exception => ex
-  puts "\n\n*********** ERROR ***********\n#{ex.message}\n\n"
-  exit
-end
+# Run!
+e = MyParser.new
+e.run
+
