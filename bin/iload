@@ -51,7 +51,7 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:input] = v
   end
 
-  opts.on("-f", "--format FORMAT", "Input file format, available values include (CSV|FX) ") do |v|
+  opts.on("-f", "--format FORMAT", "Input file format, available values include (CSV|FX|RPT) ") do |v|
     $options[:format] = v
   end
 
@@ -71,7 +71,7 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:table] = v
   end
   
-  opts.on("--drop", "") do |v|
+  opts.on("--drop", "Drop the table if it already exists") do |v|
     $options[:drop] = v
   end
   
@@ -308,7 +308,12 @@ class MyParser
 
   def load_fx
     # Load data
-    data = IO.read($options[:input]).split("\n")
+    data = IO.read($options[:input])
+    
+    # Remove the leading "FEFF" char (Byte Order Mark) from the data 
+    # Such char usually exists in .RPT file
+    data.gsub!(["feff".hex].pack('U*'), '')
+    data = data.split(/[\r\n]+/)
     header = data.shift
     headers = header.scan(/[^\s]+\s+/)
 
