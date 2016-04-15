@@ -314,7 +314,15 @@ class MyParser
     # Such char usually exists in .RPT file
     data.gsub!(["feff".hex].pack('U*'), '')
     data = data.split(/[\r\n]+/)
+    
+    # Note: shift must be made in order    
     header = data.shift
+    
+    # in case of RPT, remove the first line if it only contains the dash (-) char
+    if $options[:format] == 'RPT'
+      data.shift if data[0] =~ /^[\-\s]*$/ 
+    end
+    
     headers = header.scan(/[^\s]+\s+/)
 
     # Parse
