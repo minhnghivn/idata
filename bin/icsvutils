@@ -1,0 +1,220 @@
+#!/usr/bin/env ruby
+# DATA LOADER
+#
+# @author Nghi Pham
+# @date April 2014
+#
+
+require '../lib/idata/detector'
+require 'optparse'
+require 'csv'
+require 'sqlite3'
+
+begin
+  require 'active_record'
+rescue Exception => ex
+end
+
+begin
+  require 'activerecord'
+rescue Exception => ex
+end
+
+require 'rubygems'
+require 'fileutils'
+
+def error(msg)
+  puts "Error: #{msg}"
+  exit(-1)
+end
+
+$options = {:actions => {}}
+parser = OptionParser.new("", 24) do |opts|
+  opts.banner = "Program: icsvutils #{1}\nAuthor: Gaugau\n\nUsage: iscvutils file [options]\n"
+  opts.version = 1
+
+  opts.separator ""
+  opts.separator "Command options:"
+  
+  opts.on("--set-delim DELIMITER", "Set file delimiter") do |v|
+    $options[:actions][:set_delim] = v
+  end
+  
+  opts.on("--set-encoding DELIMITER", "Set file encoding. Valid values include: UTF8, UTF16, ASCII, ISO, etc.") do |v|
+    $options[:actions][:set_encoding] = v
+  end
+  
+  opts.separator ""
+  opts.separator "Common options:"
+
+  opts.on_tail('--help', 'Displays this help') do
+    puts opts, "", help
+    exit
+  end
+	
+end
+
+parser.parse!
+
+$options[:input] = ARGV[0]
+
+CSV_DEFAULT_DELIMITER = ','
+CSV_DEFAULT_QUOTE = '"'
+
+if $options[:input].nil?
+  error "Please specify input file"
+end
+
+if File.exists?($options[:input]) && File.directory?($options[:input])
+  error "`#{$options[:input]}` is a directory! input must be a file"
+end
+
+unless File.exists?($options[:input])
+  error "file `#{$options[:input]}` not found!"
+end
+
+if $options[:actions].empty?
+  error "Please specify at least one action: --set-delim / --set-encoding"
+end
+
+$options[:delim] ||= Idata::Detector::new($options[:input]).find
+$options[:format] ||= 'CSV'
+$options[:quote] ||= CSV_DEFAULT_QUOTE
+$options[:table] ||= 'items'
+$options[:actions][:set_delim] ||= CSV_DEFAULT_DELIMITER
+
+p $options
+
+$tmpfile = "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
+
+class String
+  def underscore
+    return self if self.nil?
+    return self.strip.gsub(/[^a-z0-9]+/, "_")
+  end
+end
+
+class MyParser
+  def initialize
+  end
+
+  def run  
+    load_fx if $options[:format] == 'FX' || $options[:format] == 'RPT'
+    load_csv if $options[:format] == 'CSV'
+  end
+
+  def load_csv
+    # Load CSV data from input file to a temp array    
+    csv_data = []
+    CSV.foreach($options[:input], :col_sep => $options[:delim], :quote_char => $options[:quote], :converters => $csv_converters) do |csv|
+      csv_data << csv
+    end
+    
+    # Serialize array into a new CSV (with standard delimiter, quote) for later use with PostgreSQL
+    CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE) do |writer|
+      csv_data.each do |csv|
+        writer << csv unless csv.empty? # performance caveat here
+      end
+    end
+    
+    # Send to PostgreSQL
+    create_table_from_csv($tmpfile)
+  end
+
+  def load_fx
+    # Load data
+    data = IO.read($options[:input])
+    
+    # Remove the leading "FEFF" char (Byte Order Mark) from the data 
+    # Such char usually exists in .RPT file
+    data.gsub!(["feff".hex].pack('U*'), '')
+    data = data.split(/[\r\n]+/)
+    
+    # Note: shift must be made in order    
+    header = data.shift
+    
+    # in case of RPT, remove the first line if it only contains the dash (-) char
+    if $options[:format] == 'RPT'
+      data.shift if data[0] =~ /^[\-\s]*$/ 
+    end
+    
+    headers = header.scan(/[^\s]+\s+/)
+
+    # Parse
+    ranges = headers.map{|s| "a#{s.size}"}.join("")
+    headers.map!{|s| s.downcase.strip }
+
+    # Write
+    CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE) do |csv|
+      csv << headers
+      data.each_with_index{|s, index|
+        record = s.unpack(ranges).map{|e| e.strip}
+        
+        # take advantage of CSV converters
+        $csv_converters.each {|converter|
+          converter_lambda = CSV::Converters[converter]
+          record.map!(&converter_lambda)
+        }
+        
+        csv << record
+      }
+    end
+    
+    # Send to PostgreSQL
+    create_table_from_csv($tmpfile)
+  end
+
+  def create_table_from_csv(csv_path)
+    # Get headers
+    csv = CSV.open(csv_path, :headers => true, :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE)
+    
+    first = csv.first
+    unless first
+      raise "File Empty!!!"
+    end
+    
+    # sanitize
+    headers = first.headers
+    headers.each_with_index {|e, index|
+      if e.nil? or e.empty?
+        headers[index] = "column_#{index + 1}"
+      end
+    }
+    headers.map!{|e| e.downcase.underscore }
+    
+    # check if every field name is unique
+    if headers.count != headers.uniq.count
+      error "duplicate field name [#{headers.sort.join(', ')}]"
+    end
+
+    create_table_sql = headers.map{|e| "\"#{e}\" text"}.join(",")
+    create_table_sql = "create table #{$options[:table]}( #{create_table_sql} );"
+puts create_table_sql
+    importcmd = %Q{
+      sqlite3 /tmp/i <<!
+#{create_table_sql}
+.headers off
+.mode csv
+.separator "#{$options[:delim]}"
+.import #{$options[:input]} items
+.separator "#{$options[:actions][:set_delim]}"
+.output #{$options[:input]}
+SELECT * FROM items;
+!
+    }
+    
+    `#{importcmd}`
+                
+    # Clean up
+    File.delete(csv_path) if File.exists?(csv_path)
+      
+    if $?.exitstatus != 0 
+      puts "Something went wrong!"
+    end
+  end
+end
+
+# Run!
+e = MyParser.new
+e.run
+
