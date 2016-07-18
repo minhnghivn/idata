@@ -9,18 +9,6 @@ require 'idata'
 require 'optparse'
 require 'csv'
 require 'sqlite3'
-
-begin
-  require 'active_record'
-rescue Exception => ex
-end
-
-begin
-  require 'activerecord'
-rescue Exception => ex
-end
-
-require 'rubygems'
 require 'fileutils'
 
 def error(msg)
