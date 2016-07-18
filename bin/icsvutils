@@ -10,6 +10,7 @@ require 'optparse'
 require 'csv'
 require 'sqlite3'
 require 'fileutils'
+require 'digest/sha1'
 
 def error(msg)
   puts "Error: #{msg}"
