@@ -10,6 +10,7 @@ class Array
     self.each do |e|
       h[e.first] = e.last
     end
+    return h
   end
 end
 
