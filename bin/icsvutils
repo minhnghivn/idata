@@ -29,29 +29,37 @@ def error(msg)
 end
 
 $options = {:actions => {}}
-parser = OptionParser.new("", 24) do |opts|
-  opts.banner = "Program: icsvutils #{1}\nAuthor: Gaugau\n\nUsage: iscvutils file [options]\n"
+parser = OptionParser.new("", 30) do |opts|
+  opts.banner = "Program: icsvutils #{Idata::VERSION}\nAuthor: Gaugau\nUsage: iscvutils file [options]\n"
   opts.version = 1
-
-  opts.separator ""
-  opts.separator "Command options:"
   
   opts.on("--set-delim DELIMITER", "Set file delimiter") do |v|
     $options[:actions][:set_delim] = v
   end
   
-  opts.on("--set-encoding DELIMITER", "Set file encoding. Valid values include: UTF8, UTF16, ASCII, ISO, etc.") do |v|
+  opts.on("--set-encoding ENCODING", "Set file encoding. Valid values include: UTF8, UTF16, ISO, etc.") do |v|
     $options[:actions][:set_encoding] = v
   end
-  
-  opts.separator ""
-  opts.separator "Common options:"
 
   opts.on_tail('--help', 'Displays this help') do
     puts opts, "", help
     exit
   end
-	
+end
+
+def help
+  return <<-eos
+Example:
+-------------------------------------------------------
+Convert a tabular file to a tab-separated one.\nNote that the original file format will be auto detected
+    
+    icsvutils /path/to/file --set-delim=$'\\t'
+
+Convert a tabular file to a CSV (comma-delimited) one
+    
+    icsvutils /path/to/file --set-delim=","
+
+eos
 end
 
 parser.parse!
@@ -82,8 +90,6 @@ $options[:format] ||= 'CSV'
 $options[:quote] ||= CSV_DEFAULT_QUOTE
 $options[:table] ||= 'items'
 $options[:actions][:set_delim] ||= CSV_DEFAULT_DELIMITER
-
-p $options
 
 $tmpfile = "/tmp/#{Digest::SHA1.hexdigest(rand(100000).to_s)}.csv"
 
@@ -189,7 +195,7 @@ class MyParser
 
     create_table_sql = headers.map{|e| "\"#{e}\" text"}.join(",")
     create_table_sql = "create table #{$options[:table]}( #{create_table_sql} );"
-puts create_table_sql
+
     importcmd = %Q{
       sqlite3 /tmp/i <<!
 #{create_table_sql}
