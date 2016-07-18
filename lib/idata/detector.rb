@@ -4,6 +4,15 @@ require 'csv'
 Encoding.default_internal = Encoding::UTF_8
 Encoding.default_external = Encoding::UTF_8
 
+class Array
+  def to_h
+    h = {}
+    self.each do |e|
+      h[e.first] = e.last
+    end
+  end
+end
+
 module Idata
   class Detector
     DEFAULT_DELIMITER = ","
