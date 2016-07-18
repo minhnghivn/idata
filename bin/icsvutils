@@ -5,7 +5,7 @@
 # @date April 2014
 #
 
-require '../lib/idata/detector'
+require 'idata'
 require 'optparse'
 require 'csv'
 require 'sqlite3'
@@ -197,7 +197,7 @@ class MyParser
     create_table_sql = "create table #{$options[:table]}( #{create_table_sql} );"
 
     importcmd = %Q{
-      sqlite3 /tmp/i <<!
+      sqlite3 <<!
 #{create_table_sql}
 .headers off
 .mode csv
