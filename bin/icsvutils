@@ -20,7 +20,7 @@ end
 $options = {:actions => {}}
 parser = OptionParser.new("", 30) do |opts|
   opts.banner = "Program: icsvutils #{Idata::VERSION}\nAuthor: Gaugau\nUsage: iscvutils file [options]\n"
-  opts.version = 1
+  opts.version = Idata::VERSION
   
   opts.on("--set-delim DELIMITER", "Set file delimiter") do |v|
     $options[:actions][:set_delim] = v
