@@ -9,6 +9,7 @@
 # * Integrity (cross reference)
 # * Data type: numeric, text, enum, etc.
 # * Data format: text size, text values, enum, inclusion, exclusion, etc.
+# * File type: CSV
 #
 # Issue ruby load.rb --help for guideline/examples
 #
@@ -34,11 +35,11 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("--unique FIELD", "Check if FIELD is unique") do |v|
     $options[:unique] << v
   end
-  
+
   opts.on("--consistent-by F1|F2,F3,F4...", "Check if F1 is uniquely identified by the composite of [F2,F3,F4]") do |v|
     $options[:consistent_by] << v
   end
-  
+
   opts.on("--not-null FIELD", "Check if FIELD is null or empty") do |v|
     $options[:not_null] << v
   end
@@ -54,11 +55,11 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("--cross-reference EXPR", "See example") do |v|
     $options[:cross_reference] << v
   end
-  
+
   opts.on("--query QUERY", "Custom query (whitelist)") do |v|
     $options[:query] << v
   end
-  
+
   opts.on("--rquery QUERY", "Custom query (blacklist)") do |v|
     $options[:rquery] << v
   end
@@ -70,11 +71,11 @@ parser = OptionParser.new("", 24) do |opts|
   opts.on("--log-to FIELD", "Field to log error to") do |v|
     $options[:log_to] = v
   end
-  
+
   opts.on("--pretty", "Use more human-readable error message") do |v|
     $options[:pretty] = v
   end
-  
+
   opts.on("--case-insensitive", "As its name implies ^.^") do |v|
     $options[:case_insensitive] = v
   end
@@ -99,10 +100,14 @@ parser = OptionParser.new("", 24) do |opts|
     $options[:listen] = v
   end
 
+  opts.on("-csv", "--csv FILE", "Validate invalid lines, eg. suspicious line breakdowns") do |v|
+    $options[:csv_file] = v
+  end
+
   opts.on_tail('--help', 'Displays this help') do
-		puts opts, "", help
+    puts opts, "", help
     exit
-	end
+  end
 end
 
 def help
@@ -187,16 +192,16 @@ class String
     sql = a.map{|s|
       "#{s} IS NOT NULL AND length(trim(#{s}::text)) <> 0"
     }.join(" AND ")
-    
+
     "(#{sql})"
   end
-  
+
   def lower
     a = self.split(/\s*,\s*/)
     sql = a.map{|s|
       "lower(#{s})"
     }.join(",")
-    
+
     sql
   end
 end
@@ -210,7 +215,7 @@ puts "------------------------------------------"
 # Add column errors if not yet exists
 # --------------------------------------------------------------------
 pre_sql = <<-eos
-  DO $$ 
+  DO $$
     BEGIN
       BEGIN
         ALTER TABLE #{$options[:table]} ADD COLUMN #{$options[:log_to]} text default '';
@@ -241,7 +246,7 @@ $options[:unique].each do |field|
         HAVING count(*) > 1
       ) AND #{field.not_null_sql};
     eos
-    
+
     ActiveRecord::Base.connection.execute(uniq_sql)
   rescue Exception => ex
     puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
@@ -254,17 +259,17 @@ end
 $options[:consistent_by].each do |fields|
   begin
     fields = fields.split(/\s*\|\s*/)
-    
+
     raise "input must be in field1|field2 format" if fields.count != 2
-    
+
     f1_case = f1 = fields.first
     f2_case = f2 = fields.last
-    
+
     if $options[:case_insensitive]
       f1_case = f1_case.lower
       f2_case = f2_case.lower
     end
-    
+
     puts "Checking consistency: #{f1} | #{f2}"
 
     uniq_sql = <<-eos
@@ -277,7 +282,7 @@ $options[:consistent_by].each do |fields|
         HAVING COUNT(distinct #{f1_case}) > 1
       );
     eos
-    
+
     ActiveRecord::Base.connection.execute(uniq_sql)
   rescue Exception => ex
     puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
@@ -295,9 +300,9 @@ $options[:not_null].each do |field|
       UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} is null', ' || '), ' || ')
       WHERE #{field} IS NULL OR length(trim(#{field})) = 0;
     eos
-    
+
     ActiveRecord::Base.connection.execute(not_null_sql)
-  
+
   rescue Exception => ex
     if ex.message.include?('PG::UndefinedColumn')
       not_null_sql = <<-eos
@@ -318,14 +323,14 @@ $options[:match].each do |value|
     field = value[/^[^\/]+/]
     regexp = value[/(?<=\/).*(?=\/)/]
     puts "Checking REGEXP matching: #{field} ~ #{regexp}"
-    
+
     msg = $options[:pretty] ? "Invalid #{field}" : "#{field} does not match [#{regexp.gsub("'", "''")}]"
-    
+
     match_sql = <<-eos
       UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{msg}', ' || '), ' || ')
       WHERE #{field} IS NOT NULL AND length(trim(#{field})) <> 0 AND #{field} !~ '#{regexp}';
     eos
-    
+
     ActiveRecord::Base.connection.execute(match_sql)
   rescue Exception => ex
     puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
@@ -345,7 +350,7 @@ $options[:not_match].each do |value|
       UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{field} does match [#{regexp.gsub("'", "''")}]', ' || '), ' || ')
       WHERE #{field} IS NOT NULL AND length(trim(#{field})) <> 0 AND #{field} ~ '#{regexp}';
     eos
-    
+
     ActiveRecord::Base.connection.execute(not_match_sql)
   rescue Exception => ex
     puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
@@ -363,13 +368,13 @@ $options[:cross_reference].each do |value|
       raise "Error: Wrong argument for --cross-reference switch"
       exit(0)
     end
-    
+
     field = values[0]
     ref_table = values[1]
     ref_field = values[2]
 
     puts "Checking data integrity: #{value}"
-    
+
     if $options[:case_insensitive]
       join_condition = "on lower(origin.#{field}) = lower(target.#{ref_field})"
     else
@@ -385,7 +390,7 @@ $options[:cross_reference].each do |value|
         where target.#{ref_field} is null
       ) AND #{field} IS NOT NULL AND length(trim(#{field})) <> 0;
     eos
-    
+
     ActiveRecord::Base.connection.execute(ref_sql)
   rescue Exception => ex
     puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
@@ -402,7 +407,7 @@ $options[:query].each do |query|
     else
       message = "custom-validation"
     end
-    
+
     puts "Checking with custom query: #{query[0..50]}#{query.size > 51 ? "..." : "" }"
 
     # @todo: poor performance here, think of a better SQL!!!
@@ -410,7 +415,7 @@ $options[:query].each do |query|
       UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{message}', ' || '), ' || ')
       WHERE NOT #{query}
     eos
-    
+
     ActiveRecord::Base.connection.execute(custom_sql)
   rescue Exception => ex
     puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
@@ -427,7 +432,7 @@ $options[:rquery].each do |query|
     else
       message = "custom-validation"
     end
-    
+
     puts "Checking with custom query: #{query[0..50]}#{query.size > 51 ? "..." : "" }"
 
     # @todo: poor performance here, think of a better SQL!!!
@@ -435,13 +440,47 @@ $options[:rquery].each do |query|
       UPDATE #{$options[:table]} SET #{$options[:log_to]} = array_to_string(string_to_array(#{$options[:log_to]}, ' || ') || string_to_array('#{message}', ' || '), ' || ')
       WHERE #{query}
     eos
-    
+
     ActiveRecord::Base.connection.execute(custom_sql)
   rescue Exception => ex
     puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
   end
 end
 
+# --------------------------------------------------------------------
+# CSV validation
+# --------------------------------------------------------------------
+$options[:csv_file].each do |query|
+  begin
+    puts "Checking with custom query: #{query[0..50]}#{query.size > 51 ? "..." : "" }"
 
+    TAB = %Q{\t}
+    COMMA = %Q{,}
+    delim = TAB
+    no_seq = 0
+    invalids = Array.new
+
+    File.open($options[:csv_file]) do |f|
+      header = f.first
+      delim = header.include?(TAB) ? TAB : COMMA
+      no_seq = CSV.parse_line(header, {:col_sep => delim}).size
+      cursor = 1
+
+      f.each_line.lazy.select{|line|
+        cursor += 1
+        begin
+          invalids << cursor if (CSV.parse_line(line, {:col_sep => delim}).size - no_seq).abs > 3
+        rescue Exception => ex
+          invalids << cursor
+          next
+        end
+      }.force
+    end
+
+    p "Lines that maybe invalid: #{invalids.join(COMMA)}" unless invalids.empty?
+  rescue Exception => ex
+    puts "    --> *** ERROR ***: #{ex.message.split("\n").first }"
+  end
+end
 
 
