@@ -21,13 +21,17 @@ $options = {:actions => {}}
 parser = OptionParser.new("", 30) do |opts|
   opts.banner = "Program: icsvutils #{Idata::VERSION}\nAuthor: Gaugau\nUsage: iscvutils file [options]\n"
   opts.version = Idata::VERSION
-  
+
   opts.on("--set-delim DELIMITER", "Set file delimiter") do |v|
     $options[:actions][:set_delim] = v
   end
-  
+
   opts.on("--set-encoding ENCODING", "Set file encoding. Valid values include: UTF8, UTF16, ISO, etc.") do |v|
     $options[:actions][:set_encoding] = v
+  end
+
+  opts.on("--check", "Validate invalid lines, eg. suspicious line breakdowns") do |v|
+    $options[:actions][:check] = v
   end
 
   opts.on_tail('--help', 'Displays this help') do
@@ -41,12 +45,15 @@ def help
 Example:
 -------------------------------------------------------
 Convert a tabular file to a tab-separated one.\nNote that the original file format will be auto detected
-    
+
     icsvutils /path/to/file --set-delim=$'\\t'
 
 Convert a tabular file to a CSV (comma-delimited) one
-    
+
     icsvutils /path/to/file --set-delim=","
+Check a CSV (any kinds of delimiter) if it contains suspicious line breakdowns
+
+    icsvutils /path/to/file --check
 
 eos
 end
@@ -55,8 +62,11 @@ parser.parse!
 
 $options[:input] = ARGV[0]
 
-CSV_DEFAULT_DELIMITER = ','
-CSV_DEFAULT_QUOTE = '"'
+TAB = %Q{\t}
+COMMA = %Q{,}
+QUOTE = %Q{"}
+CSV_DEFAULT_DELIMITER = COMMA
+CSV_DEFAULT_QUOTE = QUOTE
 
 if $options[:input].nil?
   error "Please specify input file"
@@ -71,7 +81,7 @@ unless File.exists?($options[:input])
 end
 
 if $options[:actions].empty?
-  error "Please specify at least one action: --set-delim / --set-encoding"
+  error "Please specify at least one action: --set-delim / --set-encoding / --check"
 end
 
 $options[:delim] ||= Idata::Detector::new($options[:input]).find
@@ -93,25 +103,29 @@ class MyParser
   def initialize
   end
 
-  def run  
+  def run
+    if $options[:actions][:check]
+      check_csv
+    end
+
     load_fx if $options[:format] == 'FX' || $options[:format] == 'RPT'
     load_csv if $options[:format] == 'CSV'
   end
 
   def load_csv
-    # Load CSV data from input file to a temp array    
+    # Load CSV data from input file to a temp array
     csv_data = []
     CSV.foreach($options[:input], :col_sep => $options[:delim], :quote_char => $options[:quote], :converters => $csv_converters) do |csv|
       csv_data << csv
     end
-    
+
     # Serialize array into a new CSV (with standard delimiter, quote) for later use with PostgreSQL
     CSV.open($tmpfile, "wb", :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE) do |writer|
       csv_data.each do |csv|
         writer << csv unless csv.empty? # performance caveat here
       end
     end
-    
+
     # Send to PostgreSQL
     create_table_from_csv($tmpfile)
   end
@@ -119,20 +133,20 @@ class MyParser
   def load_fx
     # Load data
     data = IO.read($options[:input])
-    
-    # Remove the leading "FEFF" char (Byte Order Mark) from the data 
+
+    # Remove the leading "FEFF" char (Byte Order Mark) from the data
     # Such char usually exists in .RPT file
     data.gsub!(["feff".hex].pack('U*'), '')
     data = data.split(/[\r\n]+/)
-    
-    # Note: shift must be made in order    
+
+    # Note: shift must be made in order
     header = data.shift
-    
+
     # in case of RPT, remove the first line if it only contains the dash (-) char
     if $options[:format] == 'RPT'
-      data.shift if data[0] =~ /^[\-\s]*$/ 
+      data.shift if data[0] =~ /^[\-\s]*$/
     end
-    
+
     headers = header.scan(/[^\s]+\s+/)
 
     # Parse
@@ -144,17 +158,17 @@ class MyParser
       csv << headers
       data.each_with_index{|s, index|
         record = s.unpack(ranges).map{|e| e.strip}
-        
+
         # take advantage of CSV converters
         $csv_converters.each {|converter|
           converter_lambda = CSV::Converters[converter]
           record.map!(&converter_lambda)
         }
-        
+
         csv << record
       }
     end
-    
+
     # Send to PostgreSQL
     create_table_from_csv($tmpfile)
   end
@@ -162,12 +176,12 @@ class MyParser
   def create_table_from_csv(csv_path)
     # Get headers
     csv = CSV.open(csv_path, :headers => true, :col_sep => CSV_DEFAULT_DELIMITER, :quote_char => CSV_DEFAULT_QUOTE)
-    
+
     first = csv.first
     unless first
       raise "File Empty!!!"
     end
-    
+
     # sanitize
     headers = first.headers
     headers.each_with_index {|e, index|
@@ -176,7 +190,7 @@ class MyParser
       end
     }
     headers.map!{|e| e.downcase.underscore }
-    
+
     # check if every field name is unique
     if headers.count != headers.uniq.count
       error "duplicate field name [#{headers.sort.join(', ')}]"
@@ -197,15 +211,50 @@ class MyParser
 SELECT * FROM items;
 !
     }
-    
+
     `#{importcmd}`
-                
+
     # Clean up
     File.delete(csv_path) if File.exists?(csv_path)
-      
-    if $?.exitstatus != 0 
+
+    if $?.exitstatus != 0
       puts "Something went wrong!"
     end
+  end
+
+  def check_csv
+    delim = CSV_DEFAULT_DELIMITER
+    no_seq = 0
+    invalids = Array.new
+
+    File.open($options[:input]) do |raw|
+      header = raw.first
+      delim = header.include?(TAB) ? TAB : COMMA
+      no_seq = CSV.parse_line(
+          header, {:col_sep => delim}
+        ).size
+
+      # iota variable start
+      cursor = 1
+
+      # laziness saves memory
+      raw.each_line.lazy.select{|line|
+        cursor += 1
+        puts "Rows: #{cursor}" if cursor % 50_000 == 0
+
+        begin
+          invalids << cursor if (CSV.parse_line(line, {:col_sep => delim}).size - no_seq).abs > 3
+        rescue Exception => ex
+          invalids << cursor
+          next
+        end
+
+      }.force
+
+    end
+    puts "#{invalids.length} Lines that maybe invalid: \n#{invalids.join(COMMA)}" unless invalids.empty?
+
+    exit(true)
   end
 end
 
